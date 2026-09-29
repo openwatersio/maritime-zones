@@ -1,0 +1,37 @@
+{
+  "internal": {
+    "title": "Internal Waters (v4, world, 2023)",
+    "features": 113,
+    "sha256": "c64e41ba98c6a5ba8f75ac908500061243a25b083501780f5e67a0ecaddc4b37"
+  },
+  "archipelagic": {
+    "title": "Archipelagic Waters (v4, world, 2023)",
+    "features": 23,
+    "sha256": "c6519d3c5c3258c417f4b21075ca2452ecabb167af5c26b96557d220ab3a0e36"
+  },
+  "12nm": {
+    "title": "Territorial Seas (12 NM) (v4, world, 2023)",
+    "features": 230,
+    "sha256": "22240f442f13018f5f62dc74e152d4dcace714eee635a469849c4e6351cbd682"
+  },
+  "24nm": {
+    "title": "Contiguous Zones (24 NM) (v4, world, 2023)",
+    "features": 220,
+    "sha256": "0bb0f10e28ea841ede6a1e3442d51703d2ba99f7f4e4e021ea7afef3be86a13a"
+  },
+  "eez": {
+    "title": "Exclusive Economic Zones (200 NM) (v12, world, 2023)",
+    "features": 285,
+    "sha256": "75785b2bc833689195b269cbd9de4f19ec502b49c53bf2c6543f6d18049790f0"
+  },
+  "high_seas": {
+    "title": "High Seas (v2, world, 2024)",
+    "features": 1,
+    "sha256": "0a9072a4e05bdb9318887db4155cfd47dbd20a8ca6c3a029624a7ddd843b3a39"
+  },
+  "land": {
+    "title": "land_v9 (coastline for Maritime Boundaries v9, without attribute information)",
+    "features": 3,
+    "sha256": "4a9aae093187c915e03948d967a72ed3dc1beecd68586e521867505fbf12d82c"
+  }
+}
