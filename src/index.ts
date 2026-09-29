@@ -83,6 +83,7 @@ function load(tile: string): Uint8Array {
     // nodes with bytes.slice(...).buffer. Node Buffers break both (small reads
     // are views into a shared pool; Buffer#slice is a view, not a copy), giving
     // wrong features or a crash. A copy into a fresh Uint8Array satisfies both.
+    // https://github.com/flatgeobuf/flatgeobuf/issues/526
     bytes = new Uint8Array(buffer);
     files.set(tile, bytes);
   }
