@@ -34,14 +34,21 @@ export function wrapped([minX, minY, maxX, maxY]: Box): Box[] {
     .filter(([a, , b]) => b >= -185 && a <= 185);
 }
 
-/** The bbox of an area. A circle's longitude span widens with latitude, up to the whole globe near the poles. */
+/**
+ * The bbox of an area. A circle's longitude span is the spherical one,
+ * asin(sin r / cos lat), which is wider than r / cos lat at high latitudes;
+ * a circle that reaches a pole spans every longitude.
+ */
 export function box(area: Area): Box {
-  if ("radiusNm" in area) {
-    const r = area.radiusNm / 60;
-    const rLon = Math.min(180, r / Math.max(Math.cos((area.lat * Math.PI) / 180), 1e-6));
-    return [area.lon - rLon, Math.max(-90, area.lat - r), area.lon + rLon, Math.min(90, area.lat + r)];
-  }
-  return [area.minLon, area.minLat, area.maxLon, area.maxLat];
+  if (!("radiusNm" in area)) return [area.minLon, area.minLat, area.maxLon, area.maxLat];
+  const { lat, lon, radiusNm } = area;
+  const r = radiusNm / 60;
+  const minY = Math.max(-90, lat - r);
+  const maxY = Math.min(90, lat + r);
+  if (Math.abs(lat) + r >= 90) return [-180, minY, 180, maxY];
+  const rad = Math.PI / 180;
+  const rLon = Math.asin(Math.sin(r * rad) / Math.cos(lat * rad)) / rad;
+  return [lon - rLon, minY, lon + rLon, maxY];
 }
 
 /** Every tile under an area, including across the antimeridian, without duplicates. */

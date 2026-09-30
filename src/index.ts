@@ -1,6 +1,6 @@
 import { deserialize } from "flatgeobuf/lib/mjs/geojson.js";
 import { fetchAll, listed, load, zoneTable } from "./store.ts";
-import { type Area, tiles, tilesIn, wrapped } from "./tiles.ts";
+import { type Area, box, tiles, tilesIn, wrapped } from "./tiles.ts";
 
 export { configure, type Config } from "./store.ts";
 export type { Area } from "./tiles.ts";
@@ -164,9 +164,8 @@ function closest(line: Point[], lat: number, lon: number): [number, Point] {
 /** Nearest line in a file, searching outward until the box holds the answer. */
 async function nearest(kind: "boundary" | "land", lat: number, lon: number, keep: (zone: Zone | null) => boolean) {
   for (let r = 0.25; r <= MAX_RADIUS; r *= 2) {
-    const rLon = Math.min(180, r / Math.max(Math.cos(lat * RAD), 1e-6));
     let best: Hit | null = null;
-    for (const f of await query(kind, lon - rLon, Math.max(-90, lat - r), lon + rLon, Math.min(90, lat + r))) {
+    for (const f of await query(kind, ...box({ lat, lon, radiusNm: r * 60 }))) {
       const zone = f.zone === undefined ? null : zones()[f.zone]!;
       if (!keep(zone)) continue;
       const [distanceNm, point] = closest(f.coordinates, lat, lon);

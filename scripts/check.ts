@@ -12,7 +12,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { configure, distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
-import { TILE, tiles } from "../src/tiles.ts";
+import { box as circleBox, TILE, tiles } from "../src/tiles.ts";
 import { DIST, LAYERS, WFS } from "./layers.ts";
 
 console.debug = () => {};
@@ -45,13 +45,8 @@ const table: { layer: string; iso_ter: string | null }[] = JSON.parse(readFileSy
  * would, so a feature missing from a tile it touches shows up as a mismatch.
  */
 function oracle(lat: number, lon: number, r: number, where: string): number | null {
-  const rLon = Math.min(180, r / Math.cos((lat * Math.PI) / 180));
-  const box = [
-    Math.max(-180, lon - rLon),
-    Math.max(-90, lat - r),
-    Math.min(180, lon + rLon),
-    Math.min(90, lat + r),
-  ] as const;
+  const [minX, minY, maxX, maxY] = circleBox({ lat, lon, radiusNm: r * 60 });
+  const box = [Math.max(-180, minX), minY, Math.min(180, maxX), maxY] as const;
   const cut = join(work, "cut.sqlite");
   rmSync(cut, { force: true });
   let first = true;

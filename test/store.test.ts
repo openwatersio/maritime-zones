@@ -16,6 +16,15 @@ beforeAll(async () => {
   server = createServer((req, res) => {
     const name = req.url!.slice(1);
     requests.push(name);
+    if (name === "truncated/n50e0.fgb") {
+      const bytes = readFileSync(new URL("n50e0.fgb", tiles));
+      res.writeHead(200, { "Content-Length": bytes.length });
+      res.flushHeaders();
+      res.write(bytes.subarray(0, bytes.length >> 1));
+      // Drop the connection after the headers and part of the body are out.
+      setTimeout(() => res.destroy(), 50);
+      return;
+    }
     if (name === "corrupt/n50e0.fgb") {
       const bytes = readFileSync(new URL("n50e0.fgb", tiles));
       bytes[bytes.length - 1]! ^= 0xff;
@@ -94,6 +103,12 @@ describe("downloads", () => {
   test("a failed download says which tile and why", async () => {
     configure({ cacheDir, baseUrl: `${baseUrl}/missing` });
     await expect(whereAmI(51.25, 2.85)).rejects.toMatchObject({ code: "DOWNLOAD_FAILED", tile: "n50e0" });
+  });
+
+  test("a connection that drops mid-download is a failed download, not a raw error", async () => {
+    configure({ cacheDir, baseUrl: `${baseUrl}/truncated` });
+    await expect(whereAmI(51.25, 2.85)).rejects.toMatchObject({ code: "DOWNLOAD_FAILED", tile: "n50e0" });
+    expect(readdirSync(cacheDir)).toEqual([]);
   });
 
   test("with downloads off, a missing tile throws instead of answering short", async () => {

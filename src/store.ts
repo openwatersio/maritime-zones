@@ -78,12 +78,17 @@ async function fromCache(tile: string): Promise<Uint8Array | undefined> {
 
 async function fromRelease(tile: string): Promise<Uint8Array> {
   const url = `${config.baseUrl}/${tile}.fgb`;
-  const response = await fetch(url).catch((error) => {
-    throw fail("DOWNLOAD_FAILED", tile, `Could not download tile ${tile} from ${url}: ${error.message}`);
-  });
-  if (!response.ok)
-    throw fail("DOWNLOAD_FAILED", tile, `Could not download tile ${tile} from ${url}: HTTP ${response.status}`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
+  const failed = (reason: string) =>
+    fail("DOWNLOAD_FAILED", tile, `Could not download tile ${tile} from ${url}: ${reason}`);
+  let bytes: Uint8Array;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw failed(`HTTP ${response.status}`);
+    // Reading the body can fail too, when the connection drops after the headers.
+    bytes = new Uint8Array(await response.arrayBuffer());
+  } catch (error) {
+    throw (error as { code?: string }).code === "DOWNLOAD_FAILED" ? error : failed((error as Error).message);
+  }
   if (sha256(bytes) !== listed()[tile]!.sha256) {
     throw fail("CHECKSUM", tile, `Tile ${tile} from ${url} does not match its sha256 in tiles.json.`);
   }
