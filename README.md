@@ -6,14 +6,12 @@ Offline answers to four questions about a position at sea: which maritime zones 
 
 ## Status
 
-Not published. Marine Regions asks that its products not be offered for download elsewhere; publishing the tiles is on hold until VLIZ answers whether derived tiles are acceptable. The licence of the `land_v9` coastline is being confirmed too. See NOTICE.
+Not published. The tiles are meant to ship as assets on this repository's GitHub releases, but Marine Regions asks that its products not be offered for download elsewhere, so the first release waits for VLIZ to answer whether derived tiles are acceptable. The licence of the `land_v9` coastline is being confirmed too. See NOTICE.
 
 ## Usage
 
 ```ts
-import { configure, distanceTo, distanceToLand, nearestTerritory, whereAmI } from "@openwaters/maritime-zones";
-
-configure({ dir: "/path/to/data" }); // zones.json, tiles.json and tiles/*.fgb
+import { distanceTo, distanceToLand, nearestTerritory, whereAmI } from "@openwaters/maritime-zones";
 
 await whereAmI(48.6, -123.2);
 // [{ layer: "12nm", iso_ter: "USA", name: "United States 12 NM", … }, { layer: "eez", iso_ter: "USA", … }]
@@ -32,7 +30,28 @@ await distanceToLand(40, -40); // 403.7 NM to the Azores
 
 Distance results carry `distanceNm`, the initial great-circle `bearingDeg` and the nearest `point`. Searches stop at about 480 NM and return `null` beyond that. Distances use a spherical Earth and agree with ellipsoidal geodesics to within 0.5%.
 
-A query reads every tile under its search box. If one of those tiles is listed in `tiles.json` but missing from disk, the query throws an error with `code: "MISSING_TILE"` and the tile's name rather than return a short answer. Use `tiles([minLon, minLat, maxLon, maxLat])` to list the tiles an area needs, adding the search radius you care about.
+## Tiles and the cache
+
+The package carries `zones.json` and `tiles.json`, which list every tile with its size and sha256, but not the tiles themselves. A query works out which 10° tiles its search needs, downloads any that aren't cached from the GitHub release matching the package version, checks each against its sha256, and keeps it in the cache for next time. A tile that fails its check is never used or cached.
+
+To be ready before losing signal, download an area ahead of time. Pass a box or a circle, and add the search radius you care about, because a query near the edge of an area can need tiles beyond it:
+
+```ts
+import { configure, download, tilesFor } from "@openwaters/maritime-zones";
+
+tilesFor({ lat: 48.6, lon: -123.2, radiusNm: 150 }); // [{ tile: "n40w130", bytes: 3044832 }, …]
+await download({ minLat: 47, minLon: -125, maxLat: 51, maxLon: -122 }); // { tiles: 2, bytes: … }
+
+configure({ download: false }); // never touch the network
+```
+
+`configure()` takes:
+
+- `cacheDir`: where tiles are kept. Defaults to `$XDG_CACHE_HOME/openwaters/maritime-zones/v<version>`, or `~/.cache/…` when that variable is unset.
+- `baseUrl`: where tiles are downloaded from. Defaults to `https://github.com/openwatersio/maritime-zones/releases/download/v<version>`.
+- `download`: `true` by default. With `false`, a query that needs a tile that isn't cached throws.
+
+Queries never answer from partial data. A tile they can't get throws an error that names the tile, with `code` set to `MISSING_TILE` (not cached and downloads are off), `DOWNLOAD_FAILED` or `CHECKSUM`.
 
 ## Data
 
@@ -58,12 +77,12 @@ Needs Node 24 and GDAL (`ogr2ogr`) with FlatGeobuf support.
 npm ci
 npm run fetch   # about 1,000 WFS requests into tmp/, cached; writes upstream.lock.json
 npm run build   # tmp/ → dist/zones.json, dist/tiles.json, dist/tiles/*.fgb
-npm test        # needs dist/
+npm test        # needs dist/; reads dist/tiles directly, offline
 ```
 
-`scripts/check.ts` compares answers at random points with the live WFS and with exact distances from GDAL, and `scripts/bench.ts` times the queries. Neither runs in CI.
+To query a local build without downloading, point the cache at it: `configure({ cacheDir: "dist/tiles", download: false })`. `scripts/check.ts` compares answers at random points with the live WFS and with exact distances from GDAL, and `scripts/bench.ts` times the queries. Neither runs in CI.
 
-The reader copies each tile into a fresh `Uint8Array` before handing it to flatgeobuf, whose in-memory reader assumes it owns its whole `ArrayBuffer` from byte 0. A Node `Buffer` from `readFileSync` breaks that assumption and gives wrong features or a crash.
+A release publishes every file in `dist/tiles/` as a flat release asset (`n40w130.fgb`, …), along with `dist/zones.json` and `dist/tiles.json`. The npm package must ship the `zones.json` and `tiles.json` from the same build, because the hashes in `tiles.json` are what downloaded tiles are checked against.
 
 ## Licence
 

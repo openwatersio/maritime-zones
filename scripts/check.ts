@@ -11,11 +11,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
+import { configure, distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
 import { TILE, tiles } from "../src/tiles.ts";
 import { DIST, LAYERS, WFS } from "./layers.ts";
 
 console.debug = () => {};
+configure({ cacheDir: join(DIST, "tiles"), download: false });
 const count = Number(process.argv[2] ?? 100);
 const work = mkdtempSync(join(tmpdir(), "maritime-zones-check-"));
 const zoneLayers = LAYERS.filter((l) => l.key !== "land");
