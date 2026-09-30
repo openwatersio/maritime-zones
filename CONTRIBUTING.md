@@ -7,6 +7,7 @@
 - `scripts/layers.ts` lists the upstream layers and paths shared by the scripts.
 - `scripts/check.ts` compares answers at random points with the live WFS and with exact GDAL distances.
 - `scripts/bench.ts` prints answers at fixed points and times each query.
+- `scripts/release-notes.ts` prints the release notes for the current build.
 - `src/` is the reader: `index.ts` has the queries, `store.ts` finds tiles in memory, the cache or the GitHub release and checks them, and `tiles.ts` maps areas to tile names.
 - `test/` holds vitest cases. `queries.test.ts` checks answers at fixed points. `store.test.ts` checks downloading and caching against a local server that serves `dist/tiles` the way a release serves assets. Both read `dist/`.
 
@@ -39,7 +40,17 @@ CI does not run the vitest suite, because the tests need `dist/`, and building i
 
 ## Releases
 
-Nothing is published. A release will attach every `dist/tiles/*.fgb`, plus `dist/zones.json` and `dist/tiles.json`, as flat assets on the GitHub release `v<version>`. The reader downloads tiles from there, so the tag must match the package version, and the npm package must carry the `zones.json` and `tiles.json` from the same build. The package is `private` for now: Marine Regions asks that its products not be offered for download elsewhere, and we have asked VLIZ whether derived tiles are acceptable and whether the `land_v9` coastline is CC-BY. How the tiles ship depends on the answer. Publishing also needs a JavaScript build, because Node does not strip TypeScript types inside `node_modules`.
+Tiles ship as flat assets on the GitHub release `v<version>`, where `<version>` is the one in `package.json`: every `dist/tiles/*.fgb` plus `dist/zones.json` and `dist/tiles.json`. The reader downloads tiles from the release matching its own version and checks them against the hashes in its packaged `tiles.json`, so a release is never replaced. New tiles need a new version.
+
+To release:
+
+1. If Marine Regions has changed, run `npm run fetch` and commit the new `upstream.lock.json` in a pull request. The release workflow refuses to publish data that differs from the committed lock.
+2. Bump `version` in `package.json` in a pull request.
+3. Run the **Release tiles** workflow from the Actions tab. It fetches every layer from VLIZ (about 30 minutes), builds the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads the 606 assets, checks the count and then publishes.
+
+The npm package must carry the `zones.json` and `tiles.json` from the release it points at; take them from the release rather than rebuilding.
+
+Nothing is published yet. The package is `private`: Marine Regions asks that its products not be offered for download elsewhere, and we have asked VLIZ whether derived tiles are acceptable and whether the `land_v9` coastline is CC-BY. Run the workflow with `dry_run` off only after they answer. Publishing to npm also needs a JavaScript build, because Node does not strip TypeScript types inside `node_modules`.
 
 ## Gotchas
 
