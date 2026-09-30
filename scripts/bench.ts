@@ -1,5 +1,9 @@
 /** Time the queries over random positions and print a few fixed ones. */
-import { distanceTo, distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
+import { fileURLToPath } from "node:url";
+import { configure, distanceTo, distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
+
+console.debug = () => {};
+configure({ cacheDir: fileURLToPath(new URL("../dist/tiles/", import.meta.url)), download: false });
 
 const fixed: [string, number, number][] = [
   ["Off Ostend", 51.25, 2.85],

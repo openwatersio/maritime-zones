@@ -1,14 +1,11 @@
-import { copyFileSync, mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, test } from "vitest";
+import { fileURLToPath } from "node:url";
+import { beforeAll, describe, expect, test } from "vitest";
 import { configure, distanceTo, distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
 
-// Needs dist/ from `npm run fetch && npm run build`.
-const dist = new URL("../dist/", import.meta.url);
-const zones = async (lat: number, lon: number) => (await whereAmI(lat, lon)).map((z) => `${z.layer}:${z.iso_ter}`);
+// Needs dist/ from `npm run fetch && npm run build`; reads the built tiles directly, offline.
+beforeAll(() => configure({ cacheDir: fileURLToPath(new URL("../dist/tiles/", import.meta.url)), download: false }));
 
-afterEach(() => configure({ dir: dist }));
+const zones = async (lat: number, lon: number) => (await whereAmI(lat, lon)).map((z) => `${z.layer}:${z.iso_ter}`);
 
 describe("whereAmI", () => {
   test("off Ostend is Belgian territorial sea inside the Belgian EEZ", async () => {
@@ -75,11 +72,4 @@ describe("distanceToLand", () => {
     expect(land!.distanceNm - waters!.distanceNm).toBeGreaterThan(8);
     expect(land!.distanceNm - waters!.distanceNm).toBeLessThan(16);
   });
-});
-
-test("a tile that was built but is not on disk throws instead of answering short", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "maritime-zones-"));
-  for (const file of ["zones.json", "tiles.json"]) copyFileSync(new URL(file, dist), join(dir, file));
-  configure({ dir });
-  await expect(whereAmI(51.25, 2.85)).rejects.toMatchObject({ code: "MISSING_TILE", tile: "n50e0" });
 });

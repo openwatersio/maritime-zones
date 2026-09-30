@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
 import { deserialize } from "flatgeobuf/lib/mjs/geojson.js";
-import { tiles } from "./tiles.ts";
+import { fetchAll, listed, load, zoneTable } from "./store.ts";
+import { type Area, box, tiles, tilesIn, wrapped } from "./tiles.ts";
 
-export { tiles } from "./tiles.ts";
+export { configure, type Config } from "./store.ts";
+export type { Area } from "./tiles.ts";
 
 export type Layer = "internal" | "archipelagic" | "12nm" | "24nm" | "eez" | "high_seas";
 
@@ -47,47 +48,23 @@ const MAX_RADIUS = 8;
 
 type Point = [number, number];
 
-let dir = new URL("../dist/", import.meta.url);
+const zones = () => zoneTable<Zone>();
 
-/** Point the reader at a data directory holding zones.json and tiles/*.fgb. Default: the package's dist/. */
-export function configure(options: { dir: string | URL }) {
-  dir = new URL(String(options.dir).replace(/\/?$/, "/"), "file:///");
-  files.clear();
-  table = undefined;
-  listed = undefined;
+/** The tiles an area needs and their download sizes. Tiles with no features are left out. */
+export function tilesFor(area: Area): { tile: string; bytes: number }[] {
+  return tilesIn(area).flatMap((tile) => (listed()[tile] ? [{ tile, bytes: listed()[tile]!.bytes }] : []));
 }
 
-let table: Zone[] | undefined;
-const zones = () => (table ??= JSON.parse(readFileSync(new URL("zones.json", dir), "utf8")) as Zone[]);
-/** Tiles the build wrote; a tile not listed has no features at all. */
-let listed: Set<string> | undefined;
-const built = () =>
-  (listed ??= new Set(Object.keys(JSON.parse(readFileSync(new URL("tiles.json", dir), "utf8")).tiles)));
-
-const files = new Map<string, Uint8Array>();
-function load(tile: string): Uint8Array {
-  let bytes = files.get(tile);
-  if (!bytes) {
-    let buffer: Buffer;
-    try {
-      buffer = readFileSync(new URL(`tiles/${tile}.fgb`, dir));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      throw Object.assign(new Error(`Tile ${tile} is not downloaded; the answer would be incomplete.`), {
-        code: "MISSING_TILE",
-        tile,
-      });
-    }
-    // flatgeobuf's ArrayReader assumes it owns the whole ArrayBuffer from byte
-    // 0: it builds DataViews on bytes.buffer ignoring byteOffset, and reads index
-    // nodes with bytes.slice(...).buffer. Node Buffers break both (small reads
-    // are views into a shared pool; Buffer#slice is a view, not a copy), giving
-    // wrong features or a crash. A copy into a fresh Uint8Array satisfies both.
-    // https://github.com/flatgeobuf/flatgeobuf/issues/526
-    bytes = new Uint8Array(buffer);
-    files.set(tile, bytes);
-  }
-  return bytes;
+/**
+ * Download the tiles an area needs into the cache ahead of time, for example
+ * before a passage without signal. Queries download missing tiles on their own
+ * unless downloads are off. Add the search radius you care about to the area:
+ * a query 100 NM from its edge can need tiles outside it.
+ */
+export async function download(area: Area): Promise<{ tiles: number; bytes: number }> {
+  const needed = tilesFor(area);
+  await fetchAll(needed.map((t) => t.tile));
+  return { tiles: needed.length, bytes: needed.reduce((sum, t) => sum + t.bytes, 0) };
 }
 
 type Kind = "zone" | "boundary" | "land";
@@ -99,15 +76,12 @@ type Found = { zone: number | undefined; coordinates: any };
  * far side of the antimeridian are found.
  */
 async function query(kind: Kind, minX: number, minY: number, maxX: number, maxY: number): Promise<Found[]> {
-  const rects = [0, 360, -360]
-    .map((shift): [number, number, number, number] => [minX + shift, minY, maxX + shift, maxY])
-    .filter(([a, , b]) => b >= -185 && a <= 185);
   const found: Found[] = [];
-  for (const box of rects) {
+  for (const box of wrapped([minX, minY, maxX, maxY])) {
     const rect = { minX: box[0], minY: box[1], maxX: box[2], maxY: box[3] };
     for (const tile of tiles(box)) {
-      if (!built().has(tile)) continue;
-      for await (const f of deserialize(load(tile), { rect })) {
+      if (!listed()[tile]) continue;
+      for await (const f of deserialize(await load(tile), { rect })) {
         const { properties, geometry } = f as unknown as {
           properties: { kind: Kind; zone?: number };
           geometry: { coordinates: any };
@@ -190,9 +164,8 @@ function closest(line: Point[], lat: number, lon: number): [number, Point] {
 /** Nearest line in a file, searching outward until the box holds the answer. */
 async function nearest(kind: "boundary" | "land", lat: number, lon: number, keep: (zone: Zone | null) => boolean) {
   for (let r = 0.25; r <= MAX_RADIUS; r *= 2) {
-    const rLon = Math.min(180, r / Math.max(Math.cos(lat * RAD), 1e-6));
     let best: Hit | null = null;
-    for (const f of await query(kind, lon - rLon, Math.max(-90, lat - r), lon + rLon, Math.min(90, lat + r))) {
+    for (const f of await query(kind, ...box({ lat, lon, radiusNm: r * 60 }))) {
       const zone = f.zone === undefined ? null : zones()[f.zone]!;
       if (!keep(zone)) continue;
       const [distanceNm, point] = closest(f.coordinates, lat, lon);
