@@ -6,7 +6,7 @@ Tiles are FlatGeobuf compressed as seekable zstd with 256 KiB frames at level 19
 
 Each entry in `tiles.json` records the size and SHA-256 of the **compressed bytes as downloaded**, including the seek table. The reader checks those bytes before caching or decompressing them. The cache stores the compressed file; memory holds a fresh `Uint8Array` of decompressed FlatGeobuf bytes.
 
-Measurements from the 2026-09-30 build cover all 604 tiles, 742 MB uncompressed. Seekable files were made with `t2sz -r`; plain files with `zstd -19`.
+Format benchmarks from the 2026-09-30 Marine Regions snapshot cover all 604 tiles, 742 MB uncompressed. OSM coastline builds have different totals; these measurements compare compression settings on the same input. Seekable files were made with `t2sz -r`; plain files with `zstd -19`.
 
 | Format                                  | Total  | Compression ratio |
 | --------------------------------------- | ------ | ----------------- |
@@ -37,7 +37,9 @@ A seekable file contains ordinary zstd frames followed by a skippable seek table
 
 ## Hosting
 
-GitHub release assets answer range requests with HTTP 206 but do not send `Access-Control-Allow-Origin` on the redirect or asset host. Node and GDAL can read them; browsers need a host with CORS headers. GitHub Pages returns 206 with `Access-Control-Allow-Origin: *`, and 140 MB fits within its 1 GB site limit.
+GitHub release assets answer range requests with HTTP 206 but do not send `Access-Control-Allow-Origin` on the redirect or asset host. Node and GDAL can read them. GitHub Pages returns 206 with `Access-Control-Allow-Origin: *`, and the 140 MB benchmark fits within its 1 GB site limit.
+
+Host the browser demo on the same Pages origin as the tiles. Cross-origin whole-tile downloads work, but Pages does not send `Access-Control-Expose-Headers: Content-Range`. FlatGeobuf's seekable reader needs that header for suffix and frame requests, so cross-origin browser range queries need another host that exposes it and allows the `Range` request header.
 
 The release and Pages mirror carry identical compressed files under the same SHA-256. `download()` defaults to releases, which have no bandwidth limit; Pages serves browser range reads and has a soft limit of 100 GB per month. `download()` can use either host through `baseUrl`, and a cached compressed tile can also be served locally for range reads.
 
