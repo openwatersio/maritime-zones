@@ -17,11 +17,38 @@ import { LAYERS, LOCK, TMP, WFS } from "./layers.ts";
 
 const fresh = process.argv.includes("--fresh");
 if (fresh) rmSync(TMP, { recursive: true, force: true });
+const started = Date.now();
+const wfs = { requests: 0, retries: 0, responseBytes: 0, elapsedSeconds: 0 };
+// Keep partial load figures when fetching or coastline conversion fails.
+process.on("exit", (code) => {
+  const finished = Date.now();
+  mkdirSync(TMP, { recursive: true });
+  writeFileSync(
+    join(TMP, "fetch-stats.json"),
+    JSON.stringify(
+      {
+        startedAt: new Date(started).toISOString(),
+        finishedAt: new Date(finished).toISOString(),
+        ok: code === 0,
+        elapsedSeconds: (finished - started) / 1000,
+        wfs: { ...wfs, elapsedSeconds: wfs.elapsedSeconds || (finished - started) / 1000 },
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+});
+process.once("SIGINT", () => process.exit(130));
+process.once("SIGTERM", () => process.exit(143));
 
 async function get(query: string): Promise<string> {
   for (let attempt = 1; ; attempt++) {
+    wfs.requests++;
+    if (attempt > 1) wfs.retries++;
     const response = await fetch(`${WFS}?service=WFS&version=2.0.0&${query}`);
-    if (response.ok) return response.text();
+    const body = await response.text();
+    wfs.responseBytes += Buffer.byteLength(body);
+    if (response.ok) return body;
     if (attempt === 3) throw new Error(`WFS ${response.status}: ${query}`);
     await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
   }
@@ -69,4 +96,5 @@ for (const { typeName, key, idField = "mrgid" } of LAYERS) {
 
 writeFileSync(LOCK, JSON.stringify(lock, null, 2) + "\n");
 console.log(`Wrote ${LOCK}`);
+wfs.elapsedSeconds = (Date.now() - started) / 1000;
 await import("./fetch-land.ts");

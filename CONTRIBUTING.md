@@ -8,6 +8,7 @@
 - `scripts/check.ts` compares answers at random points with the live WFS and with exact GDAL distances.
 - `scripts/bench.ts` prints answers at fixed points and times each query.
 - `scripts/release-notes.ts` prints the release notes for the current build.
+- `scripts/update-notes.ts` prints the monthly check's WFS load and source changes.
 - `src/` is the reader: `index.ts` has the queries, `store.ts` finds tiles in memory, the cache or the GitHub release and checks them, and `tiles.ts` maps areas to tile names.
 - `test/` holds vitest cases. `queries.test.ts` checks answers at fixed points. `store.test.ts` checks downloading and caching against a local server that serves `dist/tiles` the way a release serves assets. Both read `dist/`.
 
@@ -38,15 +39,27 @@ npx tsc -p .
 
 CI does not run the vitest suite, because the tests need `dist/`, and building it downloads every layer from VLIZ. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
 
+## Monthly upstream check
+
+The **Check upstream data** workflow runs from the default branch on the first of each month at 07:17 UTC. GitHub may delay scheduled runs. To measure a run sooner, select **Run workflow** in its Actions page or run `gh workflow run updates.yml`.
+
+Each run fetches the six Marine Regions layers serially with `npm run fetch -- --fresh`, then downloads and converts the OSM coastline archive. It compares `upstream.lock.json` with the committed version. Changed data is built and tested before the workflow opens or updates a single PR on `update-upstream`. The PR lists each changed layer's old and new title, feature count and hash. Unchanged data creates no PR. If an outstanding update reverts to the committed data, its PR is closed. No release, Pages deployment or npm publication occurs.
+
+The run summary and the `upstream-load` artifact retain the load report for 90 days, including partial figures on fetch failure. `tmp/fetch-stats.json` records start/end times, success, elapsed time, actual WFS request attempts, retries and response bytes. Cache hits make no WFS requests. Response bytes count UTF-8 response bodies after HTTP decompression, including HTTP error responses; they do not measure wire traffic or server CPU. WFS time includes retry waits; full-fetch time also includes the OSM download and GDAL conversion. OSM traffic is separate from the WFS counters.
+
+With the current lock, a fresh check needs 879 WFS requests before retries: one capabilities request, six feature indexes and 872 individual features. The artifact records the actual count if upstream changes or retries occur. The WFS hashes ignore response timestamps, so an unchanged source does not produce an update just because it was fetched again. The OSM archive is hashed separately and is about 925 MB.
+
+Monthly checks are enabled at the maintainer's request while VLIZ's preference is pending in [issue #11](https://github.com/openwatersio/maritime-zones/issues/11). Share the run's report when discussing load. If VLIZ asks for less frequent fetching or a capabilities-first check, change the schedule or fetch strategy in a PR. If they ask us to stop, remove the schedule and avoid manual fetches until resolved. The v9 workaround below remains in force.
+
 ## Coastline source and VLIZ reply
 
-Permission to use Marine Regions `land_v9` and its licence are unconfirmed, so coastlines come from OpenStreetMap under ODbL 1.0. `land_v9` is excluded from `scripts/layers.ts`; fetching and building ignore any cached `tmp/land/` files. `scripts/fetch-land.ts` downloads OSM's WGS84 coastline lines, and `scripts/build.ts` writes them as `kind: "land"` features for `distanceToLand()`. The six maritime-zone and boundary layers still come from Marine Regions. [Issue #5](https://github.com/openwatersio/maritime-zones/issues/5) tracks the questions sent to VLIZ.
+Permission to use Marine Regions `land_v9` and its licence are unconfirmed, so coastlines come from OpenStreetMap under ODbL 1.0. `land_v9` is excluded from `scripts/layers.ts`; fetching and building ignore any cached `tmp/land/` files. `scripts/fetch-land.ts` downloads OSM's WGS84 coastline lines, and `scripts/build.ts` writes them as `kind: "land"` features for `distanceToLand()`. The six maritime-zone and boundary layers still come from Marine Regions. [Issue #11](https://github.com/openwatersio/maritime-zones/issues/11) tracks the questions sent to VLIZ.
 
 VLIZ's reply needs to answer two separate questions: whether we may use `land_v9`, with its applicable licence and attribution, and whether derived tiles may be offered for download through GitHub releases and Pages. Confirmation about the maritime-boundary layers alone does not settle `land_v9`.
 
 If redistribution is approved but v9 usage remains unclear or is declined, keep OSM coastlines and update the experimental status to reflect the reply's scope and conditions. If redistribution is declined, take down the release and Pages mirror using the commands below and distribute code for consumers to build locally. If both v9 usage and derived-tile redistribution are explicitly approved, restore v9 through a source-change PR:
 
-1. Record the reply and its scope in issue #5, including the confirmed v9 licence and attribution requirements.
+1. Record the reply and its scope in issue #11, including the confirmed v9 licence and attribution requirements.
 2. Add `{ key: "land", typeName: "land_v9", idField: "id" }` to `scripts/layers.ts` and remove the OSM fetch import from `scripts/fetch.ts`. In `scripts/build.ts`, replace the OSM line stream with the v9 polygon-ring path: simplify and chunk every ring into `kind: "land", zone: -1` lines, and keep land out of `zones.json`. Preserve seekable zstd compression, compressed-byte hashes and the reader's `zone: null` land results.
 3. Fetch fresh source data and commit the new `upstream.lock.json`. Replace the OSM-only build regression with a v9 polygon fixture. Update NOTICE, README, these source instructions, release notes and workflow source labels to match the confirmed terms. OSM attribution remains part of releases containing OSM data.
 4. Rebuild, run `npm test` and `node scripts/check.ts`, and require 0 zone mismatches and distance errors under 1%. Review the new tile counts, sizes and hashes.
