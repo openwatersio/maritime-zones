@@ -39,7 +39,7 @@ test("resumes verified draft assets and waits before retrying a rate-limited upl
       };
       globalThis.fetch = async (url, options) => {
         appendFileSync('calls.jsonl', JSON.stringify({ name: new URL(url).searchParams.get('name'), body: options.body.toString() }) + '\\n');
-        return calls++ === 0
+        return calls++ < 2
           ? new Response('secondary rate limit', { status: 403, headers: { 'retry-after': '60' } })
           : new Response('{}', { status: 201 });
       };
@@ -56,10 +56,11 @@ test("resumes verified draft assets and waits before retrying a rate-limited upl
     expect(calls.filter((call) => call.name).map((call) => call.name)).toEqual([
       "tiles.json",
       "tiles.json",
+      "tiles.json",
       "zones.json",
       "NOTICE",
     ]);
-    expect(calls.filter((call) => call.wait).map((call) => call.wait)).toEqual([8000, 60000, 8000, 8000]);
+    expect(calls.filter((call) => call.wait).map((call) => call.wait)).toEqual([8000, 60000, 120000, 8000, 8000]);
     expect(calls.filter((call) => call.body).every((call) => call.body === "{}")).toBe(true);
   } finally {
     rmSync(work, { recursive: true, force: true });

@@ -64,7 +64,7 @@ for (const file of files) {
       response.headers.get("x-ratelimit-remaining") === "0"
         ? Number(response.headers.get("x-ratelimit-reset")) - Date.now() / 1000
         : 0;
-    const seconds = Math.max(retryAfter || 60 * 2 ** attempt, reset);
+    const seconds = Math.max(retryAfter, 60 * 2 ** attempt, reset);
     console.log(`Rate limited; waiting ${Math.ceil(seconds)} seconds before retrying ${name}`);
     await wait(seconds);
   }
