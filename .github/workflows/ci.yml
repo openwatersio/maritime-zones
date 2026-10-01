@@ -21,3 +21,52 @@ jobs:
       - run: npx tsc -p .
       - run: npx vitest run test/regulations.test.ts
       - run: npm run demo:build
+  performance:
+    runs-on: ubuntu-latest
+    # About 11 minutes on a 20-core M1 Ultra; a 4-core runner needs headroom.
+    timeout-minutes: 45
+    permissions: { contents: read }
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }
+      - name: Skip unless the queries, the harness or the toolchain changed
+        id: changes
+        run: |
+          if git diff --name-only "$BASE...HEAD" | grep -qE '^(src|benchmarks)/|^package(-lock)?\.json$|^\.github/workflows/ci\.yml$'; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changes.outputs.run == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - if: steps.changes.outputs.run == 'true'
+        run: npm ci
+      # The newest release, because a version bump lands before its release exists.
+      # The reader checks tiles against these hashes, so both files must come from the same release as the tiles.
+      - if: steps.changes.outputs.run == 'true'
+        name: Tile metadata from the newest release
+        run: |
+          TAG=$(gh release view --json tagName -q .tagName)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          gh release download "$TAG" -p tiles.json -p zones.json -D dist
+      - if: steps.changes.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/openwaters/maritime-zones
+          key: tiles-${{ env.TAG }}-${{ hashFiles('benchmarks/cases.json') }}
+      - if: steps.changes.outputs.run == 'true'
+        name: Compare base and candidate on the same runner
+        run: node benchmarks/run.ts --base "$BASE" --release "$TAG" --output benchmark-results
+      - if: always() && steps.changes.outputs.run == 'true'
+        name: Publish timing table
+        run: cat benchmark-results/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - if: always() && steps.changes.outputs.run == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance
+          path: benchmark-results
+          retention-days: 30

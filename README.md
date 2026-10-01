@@ -101,7 +101,7 @@ npm run build   # tmp/ → dist/zones.json, dist/tiles.json, dist/tiles/*.fgb.zs
 npm test        # needs dist/; reads dist/tiles directly, offline
 ```
 
-To query a local build without downloading, point the cache at it: `configure({ cacheDir: "dist/tiles", download: false })`. `scripts/check.ts` compares answers at random points with the live WFS and with exact distances from GDAL, and `scripts/bench.ts` times the queries. Neither runs in CI.
+To query a local build without downloading, point the cache at it: `configure({ cacheDir: "dist/tiles", download: false })`. `scripts/check.ts` compares answers at random points with the live WFS and with exact distances from GDAL; it does not run in CI. `benchmarks/` times the queries against a previous revision, locally and in CI; see CONTRIBUTING.
 
 A release publishes the compressed tiles as flat release assets (`n40w130.fgb.zst`, …), along with `dist/zones.json`, `dist/tiles.json` and `NOTICE`. The Pages mirror serves the identical files at `https://openwatersio.github.io/maritime-zones/v0.1.0/`; browser range queries must run on that Pages origin. The reader must use the `zones.json` and `tiles.json` from that release, because the hashes in `tiles.json` are what downloaded tiles are checked against.
 
