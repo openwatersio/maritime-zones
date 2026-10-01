@@ -8,6 +8,8 @@ Offline answers to four questions about a position at sea: which maritime zones 
 
 The tiles release is experimental while VLIZ confirms whether derived maritime-boundary tiles may be redistributed. The release and Pages mirror may be removed if VLIZ declines. Coastlines come from OpenStreetMap under ODbL 1.0; Marine Regions `land_v9` is not used. The package remains private and is not published to npm. See NOTICE for attribution and licences.
 
+The [coastline source and VLIZ reply guide](CONTRIBUTING.md#coastline-source-and-vliz-reply) explains the v9 workaround, the confirmations needed to restore v9 and the release steps for switching sources.
+
 ## Usage
 
 Use the release's source and metadata directly while the package is private:
