@@ -1,0 +1,84 @@
+name: Check upstream data
+
+on:
+  schedule:
+    - cron: "17 7 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-update
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install GDAL
+        run: sudo apt-get update && sudo apt-get install -y gdal-bin
+      - run: npm ci
+      - name: Fetch maritime boundaries and OSM coastlines
+        id: fetch
+        run: npm run fetch -- --fresh
+      - name: Write load report and source changes
+        if: ${{ always() && steps.fetch.outcome != 'skipped' }}
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/update-notes.ts | tee "$RUNNER_TEMP/upstream-check.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the load report
+        if: ${{ always() && steps.fetch.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: upstream-load
+          path: |
+            tmp/fetch-stats.json
+            ${{ runner.temp }}/upstream-check.md
+          retention-days: 90
+      - name: Check for source changes
+        id: changes
+        run: |
+          if git diff --quiet -- upstream.lock.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install t2sz
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          sudo apt-get install -y libzstd-dev cmake
+          curl -fL https://github.com/martinellimarco/t2sz/archive/refs/tags/v1.2.5.tar.gz -o "$RUNNER_TEMP/t2sz.tar.gz"
+          echo "4bdc590a8a2085951cfbe83ef6ab22b5fd4723163662e1aae41260c0b5a49a01  $RUNNER_TEMP/t2sz.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/t2sz.tar.gz" -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/t2sz-1.2.5" -B "$RUNNER_TEMP/t2sz-build" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/t2sz-build"
+          echo "$RUNNER_TEMP/t2sz-build" >> "$GITHUB_PATH"
+      - name: Build and test changed data
+        if: steps.changes.outputs.changed == 'true'
+        run: npm run build && npm test
+      - name: Record validation in the PR body
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          printf '\nValidation passed: npm run build and npm test. No release or npm publication.\n' >> "$RUNNER_TEMP/upstream-check.md"
+      - name: Open or update the source PR
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: update-upstream
+          delete-branch: true
+          add-paths: upstream.lock.json
+          commit-message: Update upstream maritime data
+          title: Update upstream maritime data
+          body-path: ${{ runner.temp }}/upstream-check.md
