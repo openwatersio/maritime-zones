@@ -69,3 +69,4 @@ for (const { typeName, key, idField = "mrgid" } of LAYERS) {
 
 writeFileSync(LOCK, JSON.stringify(lock, null, 2) + "\n");
 console.log(`Wrote ${LOCK}`);
+await import("./fetch-land.ts");

@@ -1,41 +1,23 @@
 @openwaters/maritime-zones
 
-The code in this package is MIT licensed (see LICENSE). The data files in
-dist/ are derived from the Marine Regions Maritime Boundaries Geodatabase,
-published by the Flanders Marine Institute (VLIZ) under the Creative Commons
-Attribution 4.0 International licence
-(https://creativecommons.org/licenses/by/4.0/).
+The code in this package is MIT licensed (see LICENSE). The zone and boundary features in dist/ are derived from the Marine Regions Maritime Boundaries Geodatabase, published by the Flanders Marine Institute (VLIZ) under the Creative Commons Attribution 4.0 International licence (https://creativecommons.org/licenses/by/4.0/).
 
-Changes: polygons are rounded to 1e-5 degrees and subdivided into small
-pieces (zones.fgb); zone and coastline rings are split into short lines
-(boundaries.fgb, land.fgb); attributes are renamed and reduced.
+Changes: polygons are rounded to 1e-5 degrees and subdivided into small pieces; zone rings are split into short lines; attributes are renamed and reduced. Features are stored together in 10° FlatGeobuf tiles compressed as seekable zstd.
 
 Cite each layer as:
 
-Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Internal
-Waters, version 4. Available online at https://www.marineregions.org/.
-https://doi.org/10.14284/631
+Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Internal Waters, version 4. Available online at https://www.marineregions.org/. https://doi.org/10.14284/631
 
-Flanders Marine Institute (2023). Maritime Boundaries Geodatabase:
-Archipelagic Waters, version 4. Available online at
-https://www.marineregions.org/. https://doi.org/10.14284/629
+Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Archipelagic Waters, version 4. Available online at https://www.marineregions.org/. https://doi.org/10.14284/629
 
-Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Territorial
-Seas (12NM), version 4. Available online at https://www.marineregions.org/.
-https://doi.org/10.14284/633
+Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Territorial Seas (12NM), version 4. Available online at https://www.marineregions.org/. https://doi.org/10.14284/633
 
-Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Contiguous
-Zones (24NM), version 4. Available online at https://www.marineregions.org/.
-https://doi.org/10.14284/630
+Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Contiguous Zones (24NM), version 4. Available online at https://www.marineregions.org/. https://doi.org/10.14284/630
 
-Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Maritime
-Boundaries and Exclusive Economic Zones (200NM), version 12. Available online
-at https://www.marineregions.org/. https://doi.org/10.14284/632
+Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Maritime Boundaries and Exclusive Economic Zones (200NM), version 12. Available online at https://www.marineregions.org/. https://doi.org/10.14284/632
 
-Flanders Marine Institute (2024). Maritime Boundaries Geodatabase: High Seas,
-version 2. Available online at https://www.marineregions.org/.
-https://doi.org/10.14284/696
+Flanders Marine Institute (2024). Maritime Boundaries Geodatabase: High Seas, version 2. Available online at https://www.marineregions.org/. https://doi.org/10.14284/696
 
-Coastline (land.fgb): Marine Regions land_v9, the coastline used for
-Maritime Boundaries v9. Its licence is being confirmed with Marine Regions;
-do not publish until it is.
+Coastline features (kind=land): © OpenStreetMap contributors, available under the Open Database License (ODbL) 1.0: https://opendatacommons.org/licenses/odbl/1-0/. Derived from the WGS84 coastline lines at https://osmdata.openstreetmap.de/data/coastlines.html. The source archive URL and SHA-256 are recorded in upstream.lock.json. Coordinates are simplified at 0.0001°, rounded to 1e-5 degrees and split into short lines. The derived coastline data in the tiles is available under ODbL 1.0; zone and boundary features retain their CC-BY 4.0 licence. Attribution: https://www.openstreetmap.org/copyright.
+
+Redistribution confirmation for the derived Marine Regions tiles is pending with VLIZ. This experimental release may be removed if VLIZ declines. Marine Regions land_v9 is not used.

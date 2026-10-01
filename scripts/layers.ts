@@ -15,5 +15,4 @@ export const LAYERS = [
   { key: "24nm", typeName: "eez_24nm" },
   { key: "eez", typeName: "eez" },
   { key: "high_seas", typeName: "high_seas" },
-  { key: "land", typeName: "land_v9", idField: "id" },
 ] as { key: string; typeName: string; idField?: string }[];

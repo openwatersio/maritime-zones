@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,8 +16,8 @@ beforeAll(async () => {
   server = createServer((req, res) => {
     const name = req.url!.slice(1);
     requests.push(name);
-    if (name === "truncated/n50e0.fgb") {
-      const bytes = readFileSync(new URL("n50e0.fgb", tiles));
+    if (name === "truncated/n50e0.fgb.zst") {
+      const bytes = readFileSync(new URL("n50e0.fgb.zst", tiles));
       res.writeHead(200, { "Content-Length": bytes.length });
       res.flushHeaders();
       res.write(bytes.subarray(0, bytes.length >> 1));
@@ -25,8 +25,8 @@ beforeAll(async () => {
       setTimeout(() => res.destroy(), 50);
       return;
     }
-    if (name === "corrupt/n50e0.fgb") {
-      const bytes = readFileSync(new URL("n50e0.fgb", tiles));
+    if (name === "corrupt/n50e0.fgb.zst") {
+      const bytes = readFileSync(new URL("n50e0.fgb.zst", tiles));
       bytes[bytes.length - 1]! ^= 0xff;
       return res.end(bytes);
     }
@@ -62,7 +62,7 @@ describe("tilesFor", () => {
 
   test("reports each tile's download size", () => {
     const [salish] = tilesFor({ lat: 48.6, lon: -123.2, radiusNm: 5 });
-    expect(salish!.bytes).toBeGreaterThan(1e6);
+    expect(salish!.bytes).toBe(readFileSync(new URL("n40w130.fgb.zst", tiles)).length);
   });
 });
 
@@ -70,16 +70,33 @@ describe("downloads", () => {
   test("a query downloads the tile it needs into the cache, then answers", async () => {
     configure({ cacheDir, baseUrl });
     expect((await whereAmI(51.25, 2.85)).map((z) => `${z.layer}:${z.iso_ter}`)).toEqual(["12nm:BEL", "eez:BEL"]);
-    expect(requests).toEqual(["n50e0.fgb"]);
-    expect(readdirSync(cacheDir)).toEqual(["n50e0.fgb"]);
+    expect(requests).toEqual(["n50e0.fgb.zst"]);
+    expect(readdirSync(cacheDir)).toEqual(["n50e0.fgb.zst"]);
+    expect(readFileSync(join(cacheDir, "n50e0.fgb.zst")).equals(readFileSync(new URL("n50e0.fgb.zst", tiles)))).toBe(
+      true,
+    );
   });
 
   test("a cached tile is not downloaded again", async () => {
     configure({ cacheDir, baseUrl });
     await download({ lat: 51.25, lon: 2.85, radiusNm: 1 });
-    configure({ cacheDir, baseUrl }); // a fresh process: nothing in memory
-    await whereAmI(51.25, 2.85);
-    expect(requests).toEqual(["n50e0.fgb"]);
+    configure({ cacheDir, baseUrl, download: false }); // a fresh process: nothing in memory
+    expect((await whereAmI(51.25, 2.85)).map((z) => `${z.layer}:${z.iso_ter}`)).toEqual(["12nm:BEL", "eez:BEL"]);
+    expect(requests).toEqual(["n50e0.fgb.zst"]);
+  });
+
+  test("a damaged compressed cache is treated as missing and can be downloaded again", async () => {
+    configure({ cacheDir, baseUrl });
+    await download({ lat: 51.25, lon: 2.85, radiusNm: 1 });
+    const file = join(cacheDir, "n50e0.fgb.zst");
+    const bytes = readFileSync(file);
+    bytes[bytes.length - 1]! ^= 0xff;
+    writeFileSync(file, bytes);
+    configure({ cacheDir, baseUrl, download: false });
+    await expect(whereAmI(51.25, 2.85)).rejects.toMatchObject({ code: "MISSING_TILE", tile: "n50e0" });
+    configure({ cacheDir, baseUrl });
+    expect((await whereAmI(51.25, 2.85)).map((z) => `${z.layer}:${z.iso_ter}`)).toEqual(["12nm:BEL", "eez:BEL"]);
+    expect(requests).toEqual(["n50e0.fgb.zst", "n50e0.fgb.zst"]);
   });
 
   test("download() fetches every tile for an area and reports the total", async () => {
@@ -89,7 +106,7 @@ describe("downloads", () => {
     expect(result.tiles).toBe(tilesFor(area).length);
     expect(readdirSync(cacheDir).sort()).toEqual(
       tilesFor(area)
-        .map((t) => `${t.tile}.fgb`)
+        .map((t) => `${t.tile}.fgb.zst`)
         .sort(),
     );
   });

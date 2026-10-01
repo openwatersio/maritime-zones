@@ -1,17 +1,28 @@
 # maritime-zones
 
-Offline answers to four questions about a position at sea: which maritime zones am I in, how far is the next territory, how far is territory X, and how far is land. The data is the [Marine Regions](https://www.marineregions.org/) Maritime Boundaries Geodatabase from the Flanders Marine Institute (VLIZ), cut into 10° FlatGeobuf tiles so a consumer only needs the tiles for the area it sails in.
+Offline answers to four questions about a position at sea: which maritime zones am I in, how far is the next territory, how far is territory X, and how far is land. The data is the [Marine Regions](https://www.marineregions.org/) Maritime Boundaries Geodatabase from the Flanders Marine Institute (VLIZ), cut into 10° FlatGeobuf tiles compressed as seekable zstd so a consumer only needs the tiles for the area it sails in.
 
 **Not for navigation.** Marine Regions states that its data "is not meant to be used for legal, economical … or navigational purposes" and "has no legal value whatsoever". Neither do these answers. Every consumer that shows them must say so.
 
 ## Status
 
-Not published. The tiles are meant to ship as assets on this repository's GitHub releases, but Marine Regions asks that its products not be offered for download elsewhere, so the first release waits for VLIZ to answer whether derived tiles are acceptable. The licence of the `land_v9` coastline is being confirmed too. See NOTICE.
+The tiles release is experimental while VLIZ confirms whether derived maritime-boundary tiles may be redistributed. The release and Pages mirror may be removed if VLIZ declines. Coastlines come from OpenStreetMap under ODbL 1.0; Marine Regions `land_v9` is not used. The package remains private and is not published to npm. See NOTICE for attribution and licences.
 
 ## Usage
 
+Use the release's source and metadata directly while the package is private:
+
+```sh
+git clone https://github.com/openwatersio/maritime-zones.git
+cd maritime-zones
+git checkout v0.1.0
+npm ci
+mkdir -p dist
+gh release download v0.1.0 --pattern tiles.json --pattern zones.json --dir dist
+```
+
 ```ts
-import { distanceTo, distanceToLand, nearestTerritory, whereAmI } from "@openwaters/maritime-zones";
+import { distanceTo, distanceToLand, nearestTerritory, whereAmI } from "./src/index.ts";
 
 await whereAmI(48.6, -123.2);
 // [{ layer: "12nm", iso_ter: "USA", name: "United States 12 NM", … }, { layer: "eez", iso_ter: "USA", … }]
@@ -32,14 +43,14 @@ Distance results carry `distanceNm`, the initial great-circle `bearingDeg` and t
 
 ## Tiles and the cache
 
-The package carries `zones.json` and `tiles.json`, which list every tile with its size and sha256, but not the tiles themselves. A query works out which 10° tiles its search needs, downloads any that aren't cached from the GitHub release matching the package version, checks each against its sha256, and keeps it in the cache for next time. A tile that fails its check is never used or cached.
+The package carries `zones.json` and `tiles.json`, which list every tile with its compressed download size and sha256, but not the tiles themselves. A query works out which 10° tiles its search needs, downloads any that aren't cached from the GitHub release matching the package version, checks each against its sha256, and keeps it in the cache for next time. The cache stores compressed `.fgb.zst` downloads; the reader checks the compressed bytes before caching or decompressing them with Node 24. A tile that fails its check is never used or cached.
 
 To be ready before losing signal, download an area ahead of time. Pass a box or a circle, and add the search radius you care about, because a query near the edge of an area can need tiles beyond it:
 
 ```ts
-import { configure, download, tilesFor } from "@openwaters/maritime-zones";
+import { configure, download, tilesFor } from "./src/index.ts";
 
-tilesFor({ lat: 48.6, lon: -123.2, radiusNm: 150 }); // [{ tile: "n40w130", bytes: 3044832 }, …]
+tilesFor({ lat: 48.6, lon: -123.2, radiusNm: 150 }); // [{ tile: "n40w130", bytes: … }, …]
 await download({ minLat: 47, minLon: -125, maxLat: 51, maxLon: -122 }); // { tiles: 2, bytes: … }
 
 configure({ download: false }); // never touch the network
@@ -63,27 +74,27 @@ Queries never answer from partial data. A tile they can't get throws an error th
 | Contiguous zone     | Contiguous Zones (24 NM) v4           | 220      |
 | EEZ                 | Exclusive Economic Zones (200 NM) v12 | 285      |
 | High seas           | High Seas v2                          | 1        |
-| Coastline           | land_v9                               | 3        |
+| Coastline           | OpenStreetMap coastline lines, WGS84  | 879,204  |
 
-`upstream.lock.json` records each layer's title, feature count and content hash as served by the VLIZ WFS. The build simplifies rings with Douglas–Peucker at 0.0001° (about 11 m), so boundaries of neighboring zones can open slivers up to that width.
+`upstream.lock.json` records each layer's title, feature count and content hash as served by the VLIZ WFS, plus the OSM coastline archive URL and SHA-256. The build simplifies rings with Douglas–Peucker at 0.0001° (about 11 m), so boundaries of neighboring zones can open slivers up to that width.
 
-Each tile holds zone polygons subdivided into pieces of at most 256 vertices for point lookups, zone rings as lines for distances, and coastline rings as lines. Features are not clipped at tile edges; each one is written to every tile its bounding box touches. `zones.json` holds each zone's attributes once, and tile features refer to it by index. The 604 tiles total 742 MB; the median tile is 0.11 MB and the largest, over French Polynesia, is 23 MB.
+Each tile holds zone polygons subdivided into pieces of at most 256 vertices for point lookups, zone rings as lines for distances, and OSM coastline lines. Features are not clipped at tile edges; each one is written to every tile its bounding box touches. `zones.json` holds each zone's attributes once, and tile features refer to it by index. The 586 tiles total 282 MB compressed; the median tile is 0.06 MB and the largest is 10.2 MB. The release's `tiles.json` records each compressed download size and SHA-256; [Tile format](docs/tile-format.md) documents the compression measurements.
 
 ## Building
 
-Needs Node 24 and GDAL (`ogr2ogr`) with FlatGeobuf support.
+Needs Node 24, GDAL (`ogr2ogr`) with FlatGeobuf support, curl and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5 (`brew install gdal t2sz` on macOS).
 
 ```sh
 npm ci
-npm run fetch   # about 1,000 WFS requests into tmp/, cached; writes upstream.lock.json
-npm run build   # tmp/ → dist/zones.json, dist/tiles.json, dist/tiles/*.fgb
+npm run fetch   # maritime boundaries from WFS and OSM coastlines into tmp/, cached; writes upstream.lock.json
+npm run build   # tmp/ → dist/zones.json, dist/tiles.json, dist/tiles/*.fgb.zst
 npm test        # needs dist/; reads dist/tiles directly, offline
 ```
 
 To query a local build without downloading, point the cache at it: `configure({ cacheDir: "dist/tiles", download: false })`. `scripts/check.ts` compares answers at random points with the live WFS and with exact distances from GDAL, and `scripts/bench.ts` times the queries. Neither runs in CI.
 
-A release publishes every file in `dist/tiles/` as a flat release asset (`n40w130.fgb`, …), along with `dist/zones.json` and `dist/tiles.json`. The npm package must ship the `zones.json` and `tiles.json` from the same build, because the hashes in `tiles.json` are what downloaded tiles are checked against.
+A release publishes the compressed tiles as flat release assets (`n40w130.fgb.zst`, …), along with `dist/zones.json`, `dist/tiles.json` and `NOTICE`. The Pages mirror serves the identical files at `https://openwatersio.github.io/maritime-zones/v0.1.0/`; browser range queries must run on that Pages origin. The reader must use the `zones.json` and `tiles.json` from that release, because the hashes in `tiles.json` are what downloaded tiles are checked against.
 
 ## Licence
 
-The code is MIT. The data is CC-BY 4.0 from the Flanders Marine Institute; NOTICE has the citation for each layer.
+The code is MIT. Maritime zone and boundary features are CC-BY 4.0 from the Flanders Marine Institute. Coastline features are © OpenStreetMap contributors under ODbL 1.0. NOTICE has the citation and licence for each layer.
