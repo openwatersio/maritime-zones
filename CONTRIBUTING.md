@@ -6,7 +6,7 @@
 - `scripts/build.ts` turns `tmp/` into `dist/zones.json`, `dist/tiles.json` and `dist/tiles/*.fgb.zst` (with raw `.fgb` intermediates for the GDAL distance oracle).
 - `scripts/layers.ts` lists the upstream layers and paths shared by the scripts.
 - `scripts/check.ts` compares answers at random points with the live WFS and with exact GDAL distances.
-- `scripts/bench.ts` prints answers at fixed points and times each query.
+- `benchmarks/` times the queries offline and over HTTP range reads, working tree against a git revision. See Performance below.
 - `scripts/release-notes.ts` prints the release notes for the current build.
 - `scripts/update-notes.ts` prints the monthly check's WFS load and source changes.
 - `src/` is the reader: `index.ts` has the queries, `store.ts` finds tiles in memory, the cache or the GitHub release and checks them, and `tiles.ts` maps areas to tile names.
@@ -40,6 +40,33 @@ npm run demo:build
 ```
 
 CI does not run the vitest suite, because the tests need `dist/`, and building it downloads every layer from VLIZ. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
+
+A separate CI job benchmarks the queries when `src/`, `benchmarks/`, the dependencies or the workflow change. It uses the released tiles, so it needs no build.
+
+## Performance
+
+Benchmark the working tree against a git revision:
+
+```sh
+gh release download "v$(node -p "require('./package.json').version")" -p tiles.json -p zones.json -D dist
+node benchmarks/run.ts --base origin/main
+```
+
+The first line is only needed without a local build: the reader checks tiles against the hashes in `dist/tiles.json`, so it must be the release's copy. The command measures uncommitted edits too. Omit `--base` to compare against `HEAD`.
+
+Each workload in [`benchmarks/cases.json`](benchmarks/cases.json) is one query at one position, and runs in two modes. `offline` calls the public API over tiles in the cache, the way a Node consumer does. `range` drives the shared query code in `src/queries.ts` over HTTP range reads of the compressed tiles from a local server, the way the browser demo does, and also counts the requests and bytes one call makes. Pass `--mode offline` or `--mode range` to run one, and `--skip` with a regular expression matched against workload names to leave some out. Bases older than `src/queries.ts` only run offline.
+
+Both revisions use the current harness, tiles, dependencies and machine. The base is exported to a temporary directory, so the command never switches your checkout. Before timing, every tile the workloads can touch is downloaded into the reader's cache (`~/.cache/openwaters/maritime-zones/v<version>`, or `--cache` to use another directory, such as `dist/tiles` after a local build). Each workload gets seven pairs of base and candidate processes, alternating which runs first. A process warms up for 300 milliseconds, which includes loading its tiles, then the first pair calibrates a batch of at least 100 milliseconds and later pairs reuse it.
+
+The table reports median milliseconds per call and, for range mode, requests and bytes per call. A median slowdown above 20 percent fails the command, and so does a 20 percent rise in requests or bytes; `--threshold 10` tests another limit. The threshold is a policy limit; `npm test` and `scripts/check.ts` are the accuracy gates, and a workload whose answer differs between revisions fails the comparison outright. Timing is noisy on a busy machine, so repeat a suspicious run. Requests and bytes are exact.
+
+Raw samples, checksums, revisions, harness hash and machine metadata are saved under `.benchmarks/<timestamp>/` with `summary.md`; `--output` picks the directory. Compare saved reports from the same machine and harness with:
+
+```sh
+node benchmarks/compare.ts base.json candidate.json 20
+```
+
+CI compares a pull request with its base, or a push to `main` with the previous commit, publishes the table in the Actions summary and keeps the reports as an artifact for 30 days. The tile cache is kept between runs, keyed on the package version and the workloads.
 
 ## Pages demos
 

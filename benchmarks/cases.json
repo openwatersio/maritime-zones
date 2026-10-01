@@ -1,0 +1,20 @@
+{
+  "warmupMs": 300,
+  "sampleMs": 100,
+  "samples": 7,
+  "cases": [
+    { "name": "whereAmI/off-ostend", "query": "whereAmI", "lat": 51.25, "lon": 2.85 },
+    { "name": "whereAmI/haro-strait", "query": "whereAmI", "lat": 48.6, "lon": -123.2 },
+    { "name": "whereAmI/taveuni", "query": "whereAmI", "lat": -16.8, "lon": 179.99 },
+    { "name": "nearestTerritory/dover", "query": "nearestTerritory", "lat": 51.1, "lon": 1.4 },
+    { "name": "nearestTerritory/haro-strait", "query": "nearestTerritory", "lat": 48.6, "lon": -123.2 },
+    { "name": "nearestTerritory/taveuni", "query": "nearestTerritory", "lat": -16.8, "lon": 179.99 },
+    { "name": "nearestTerritory/mid-north-atlantic", "query": "nearestTerritory", "lat": 40, "lon": -40 },
+    { "name": "nearestTerritory/norwegian-sea", "query": "nearestTerritory", "lat": 66.2, "lon": 8.4 },
+    { "name": "nearestTerritory/labrador-sea", "query": "nearestTerritory", "lat": 60.6, "lon": -62.7 },
+    { "name": "distanceTo/dover-bel", "query": "distanceTo", "lat": 51.1, "lon": 1.4, "iso": "BEL" },
+    { "name": "distanceToLand/haro-strait", "query": "distanceToLand", "lat": 48.6, "lon": -123.2 },
+    { "name": "distanceToLand/mid-north-atlantic", "query": "distanceToLand", "lat": 40, "lon": -40 },
+    { "name": "distanceToLand/norwegian-sea", "query": "distanceToLand", "lat": 66.2, "lon": 8.4 }
+  ]
+}
