@@ -32,7 +32,7 @@
   "land": {
     "title": "OpenStreetMap coastlines (WGS84), ODbL 1.0",
     "source": "https://osmdata.openstreetmap.de/download/coastlines-split-4326.zip",
-    "features": 879204,
-    "sha256": "50bc70f4982f472a05ebcdae2e776b8052e328ff83f2fffb5533650cd74afc88"
+    "features": 879214,
+    "sha256": "449ffa23dec9c0a41d6853dfedcaf4f1b5889c4db4b1ac405bc95ac3241d5d3f"
   }
 }
