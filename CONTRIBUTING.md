@@ -38,6 +38,20 @@ npx tsc -p .
 
 CI does not run the vitest suite, because the tests need `dist/`, and building it downloads every layer from VLIZ. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
 
+## Coastline source and VLIZ reply
+
+Permission to use Marine Regions `land_v9` and its licence are unconfirmed, so coastlines come from OpenStreetMap under ODbL 1.0. `land_v9` is excluded from `scripts/layers.ts`; fetching and building ignore any cached `tmp/land/` files. `scripts/fetch-land.ts` downloads OSM's WGS84 coastline lines, and `scripts/build.ts` writes them as `kind: "land"` features for `distanceToLand()`. The six maritime-zone and boundary layers still come from Marine Regions. [Issue #5](https://github.com/openwatersio/maritime-zones/issues/5) tracks the questions sent to VLIZ.
+
+VLIZ's reply needs to answer two separate questions: whether we may use `land_v9`, with its applicable licence and attribution, and whether derived tiles may be offered for download through GitHub releases and Pages. Confirmation about the maritime-boundary layers alone does not settle `land_v9`.
+
+If redistribution is approved but v9 usage remains unclear or is declined, keep OSM coastlines and update the experimental status to reflect the reply's scope and conditions. If redistribution is declined, take down the release and Pages mirror using the commands below and distribute code for consumers to build locally. If both v9 usage and derived-tile redistribution are explicitly approved, restore v9 through a source-change PR:
+
+1. Record the reply and its scope in issue #5, including the confirmed v9 licence and attribution requirements.
+2. Add `{ key: "land", typeName: "land_v9", idField: "id" }` to `scripts/layers.ts` and remove the OSM fetch import from `scripts/fetch.ts`. In `scripts/build.ts`, replace the OSM line stream with the v9 polygon-ring path: simplify and chunk every ring into `kind: "land", zone: -1` lines, and keep land out of `zones.json`. Preserve seekable zstd compression, compressed-byte hashes and the reader's `zone: null` land results.
+3. Fetch fresh source data and commit the new `upstream.lock.json`. Replace the OSM-only build regression with a v9 polygon fixture. Update NOTICE, README, these source instructions, release notes and workflow source labels to match the confirmed terms. OSM attribution remains part of releases containing OSM data.
+4. Rebuild, run `npm test` and `node scripts/check.ts`, and require 0 zone mismatches and distance errors under 1%. Review the new tile counts, sizes and hashes.
+5. Bump the package version and publish a new tiles release and Pages mirror. Verify the fresh-cache Belgian query and Pages range reads against that release's metadata. Keep `v0.1.0` and its OSM assets unchanged: changing coastlines changes hashes, and caches are separated by version. The package stays `private: true`; npm publication needs a separate decision.
+
 ## Releases
 
 See [Tile format](docs/tile-format.md) for the seekable zstd format, compression measurements, range reads and what the download hashes cover.
