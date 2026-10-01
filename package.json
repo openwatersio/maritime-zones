@@ -42,7 +42,7 @@
   "scripts": {
     "fetch": "node scripts/fetch.ts",
     "build": "node scripts/build.ts",
-    "package:build": "tsc -p tsconfig.package.json && node scripts/build-package.ts",
+    "package:build": "node scripts/build-package.ts",
     "package:check": "node scripts/check-package.ts",
     "prepack": "node scripts/package-metadata.ts && npm run package:build",
     "test": "vitest run && tsc --noEmit",

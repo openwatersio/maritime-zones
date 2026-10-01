@@ -1,7 +1,17 @@
 import { build } from "esbuild";
-import { copyFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { copyFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./layers.ts";
+
+rmSync(join(ROOT, "lib"), { recursive: true, force: true });
+execFileSync(
+  process.execPath,
+  [join(ROOT, "node_modules/typescript/bin/tsc"), "-p", join(ROOT, "tsconfig.package.json")],
+  {
+    stdio: "inherit",
+  },
+);
 
 await build({
   entryPoints: [join(ROOT, "src/index.ts")],

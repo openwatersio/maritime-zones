@@ -1,7 +1,22 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { releaseMetadata } from "../scripts/package-metadata.ts";
+import { ROOT } from "../scripts/layers.ts";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("package builds remove obsolete JavaScript and declarations before emitting fresh artifacts", () => {
+  mkdirSync(join(ROOT, "lib/obsolete"), { recursive: true });
+  writeFileSync(join(ROOT, "lib/obsolete/removed.js"), "export const obsolete = true;");
+  writeFileSync(join(ROOT, "lib/removed.d.ts"), "export declare const obsolete: boolean;");
+  execFileSync("npm", ["run", "package:build"], { cwd: ROOT, stdio: "pipe" });
+  expect(existsSync(join(ROOT, "lib/obsolete"))).toBe(false);
+  expect(existsSync(join(ROOT, "lib/removed.d.ts"))).toBe(false);
+  expect(existsSync(join(ROOT, "lib/index.js"))).toBe(true);
+  expect(existsSync(join(ROOT, "lib/index.d.ts"))).toBe(true);
+});
 
 test("packaging takes both metadata files from the package version's release", async () => {
   const fetch = vi.fn(async (url: string) => new Response(url.endsWith("tiles.json") ? '{"tiles":{}}' : "[]"));
