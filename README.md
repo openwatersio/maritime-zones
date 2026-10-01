@@ -6,7 +6,7 @@ Offline answers to four questions about a position at sea: which maritime zones 
 
 ## Status
 
-VLIZ has approved redistribution of the derived tiles and the monthly upstream-check load. Maintainers monitor source updates to avoid distributing deprecated versions. Coastlines use the updated World Countries Geodatabase served as `MarineRegions:worldcountries_esri_2014`, the normal-baseline source identified by Marine Regions, under CC-BY 4.0. The package remains private and is not published to npm. See NOTICE for attribution and licences.
+VLIZ has approved redistribution of the derived tiles and the monthly upstream-check load. Maintainers monitor source updates to avoid distributing deprecated versions. Coastlines use the updated World Countries Geodatabase served as `MarineRegions:worldcountries_esri_2014`, the normal-baseline source identified by Marine Regions, under CC-BY 4.0. npm publication is authorized; the first publish requires the matching `v0.2.0` tile release. See NOTICE for attribution and licences.
 
 The [coastline source and VLIZ reply guide](CONTRIBUTING.md#coastline-source-and-vliz-reply) records the permission scope, source citation and release procedure. The published `v0.1.0` tiles use OpenStreetMap coastlines under ODbL 1.0; the World Countries build is version `0.2.0` and requires a new tiles release.
 
@@ -18,19 +18,14 @@ The main black-water example combines `whereAmI()` and `distanceToLand()` with a
 
 ## Usage
 
-Use the release's source and metadata directly while the package is private:
+Needs Node 24 or newer. After the first npm publication:
 
 ```sh
-git clone https://github.com/openwatersio/maritime-zones.git
-cd maritime-zones
-git checkout v0.1.0
-npm ci
-mkdir -p dist
-gh release download v0.1.0 --pattern tiles.json --pattern zones.json --dir dist
+npm install @openwaters/maritime-zones
 ```
 
 ```ts
-import { distanceTo, distanceToLand, nearestTerritory, whereAmI } from "./src/index.ts";
+import { distanceTo, distanceToLand, nearestTerritory, whereAmI } from "@openwaters/maritime-zones";
 
 await whereAmI(48.6, -123.2);
 // [{ layer: "12nm", iso_ter: "USA", name: "United States 12 NM", … }, { layer: "eez", iso_ter: "USA", … }]
@@ -56,7 +51,7 @@ The package carries `zones.json` and `tiles.json`, which list every tile with it
 To be ready before losing signal, download an area ahead of time. Pass a box or a circle, and add the search radius you care about, because a query near the edge of an area can need tiles beyond it:
 
 ```ts
-import { configure, download, tilesFor } from "./src/index.ts";
+import { configure, download, tilesFor } from "@openwaters/maritime-zones";
 
 tilesFor({ lat: 48.6, lon: -123.2, radiusNm: 150 }); // [{ tile: "n40w130", bytes: … }, …]
 await download({ minLat: 47, minLon: -125, maxLat: 51, maxLon: -122 }); // { tiles: 2, bytes: … }

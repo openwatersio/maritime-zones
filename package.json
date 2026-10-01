@@ -1,7 +1,6 @@
 {
   "name": "@openwaters/maritime-zones",
   "version": "0.2.0",
-  "private": true,
   "description": "Offline lookups against the Marine Regions maritime boundaries: which zone you are in and how far it is to a territory or to land.",
   "keywords": [
     "maritime-boundaries",
@@ -20,12 +19,32 @@
   },
   "license": "MIT",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    }
+  },
+  "types": "./lib/index.d.ts",
+  "files": [
+    "lib/",
+    "dist/zones.json",
+    "dist/tiles.json",
+    "NOTICE",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "fetch": "node scripts/fetch.ts",
     "build": "node scripts/build.ts",
+    "package:build": "node scripts/build-package.ts",
+    "package:check": "node scripts/check-package.ts",
+    "prepack": "node scripts/package-metadata.ts && npm run package:build",
     "test": "vitest run && tsc --noEmit",
     "lint": "prettier --check .",
     "format": "prettier --write .",
@@ -33,12 +52,16 @@
     "demo:dev": "node scripts/build-demo.ts --serve"
   },
   "dependencies": {
-    "flatgeobuf": "^4.5.0"
+    "@bokuweb/zstd-wasm": "0.0.27",
+    "@repeaterjs/repeater": "3.1.0",
+    "flatbuffers": "25.9.23",
+    "slice-source": "0.4.1"
   },
   "devDependencies": {
     "@types/leaflet": "1.9.21",
     "@types/node": "^26.6.3",
     "esbuild": "0.28.2",
+    "flatgeobuf": "^4.5.0",
     "leaflet": "1.9.4",
     "prettier": "^3.9.9",
     "typescript": "^7.0.2",
