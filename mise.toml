@@ -1,2 +1,8 @@
 [tools]
 node = "24"
+
+# The reader needs only Node. Building tiles also needs GDAL (ogr2ogr with
+# FlatGeobuf support) and t2sz 1.2.5, which mise cannot install.
+[tasks.setup]
+description = "Install the build-only tools, GDAL and t2sz, with Homebrew"
+run = "brew install gdal t2sz"

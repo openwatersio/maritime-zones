@@ -17,7 +17,7 @@
 
 ## Getting started
 
-Needs Node 24 (see `mise.toml`), GDAL with FlatGeobuf support for `ogr2ogr` and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5. On macOS: `brew install gdal t2sz`.
+Needs Node 24 (see `mise.toml`), GDAL with FlatGeobuf support for `ogr2ogr` and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5. On macOS: `mise run setup`, which runs `brew install gdal t2sz`.
 
 ```sh
 npm ci
