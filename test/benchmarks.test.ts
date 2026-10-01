@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { compare, type Report, type Sample } from "../benchmarks/compare.ts";
+import { digest } from "../benchmarks/digest.ts";
 import { configure, whereAmI } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -66,6 +67,7 @@ describe("compare", () => {
       (r) => (r.results[0]!.samplesMs[0] = NaN),
       (r) => (r.results[0]!.samplesMs[0] = 0),
       (r) => (r.results[0]!.checksum = 0),
+      (r) => (r.results[0]!.checksum += 1e-6),
       (r) => (r.results[0]!.checksum = Infinity),
       (r) => (r.results[0]!.iterations = 0),
     ];
@@ -106,6 +108,32 @@ describe("compare", () => {
   });
 });
 
+describe("digest", () => {
+  const zone = (mrgid: number, layer = "eez") => ({ layer, mrgid }) as any;
+  const hit = (extra = {}) => ({
+    distanceNm: 6.29,
+    bearingDeg: 143,
+    point: [51.05, 1.47] as [number, number],
+    zone: zone(3293),
+    ...extra,
+  });
+
+  test("tells apart zone sets with the same id sum and hits that differ only in bearing, point or zone", () => {
+    expect(digest([zone(1), zone(4)])).not.toBe(digest([zone(2), zone(3)]));
+    expect(digest([zone(1, "12nm"), zone(4)])).not.toBe(digest([zone(1), zone(4)]));
+    expect(digest(hit())).not.toBe(digest(hit({ bearingDeg: 144 })));
+    expect(digest(hit())).not.toBe(digest(hit({ point: [51.06, 1.47] })));
+    expect(digest(hit())).not.toBe(digest(hit({ zone: zone(3294) })));
+    expect(digest(hit())).not.toBe(digest(null));
+  });
+
+  test("ignores floating-point noise below a micro-degree and is a safe integer", () => {
+    expect(digest(hit({ distanceNm: 6.29 + 1e-9 }))).toBe(digest(hit()));
+    expect(digest(hit({ bearingDeg: 143 + 1e-9 }))).toBe(digest(hit()));
+    expect(Number.isSafeInteger(digest(hit()))).toBe(true);
+  });
+});
+
 describe("measure", () => {
   // One warmed sample per process, the way run.ts spawns it. Needs the tiles in dist/.
   const measure = (mode: string, name: string, ...extra: string[]): Sample =>
@@ -118,7 +146,7 @@ describe("measure", () => {
 
   test("the offline sample carries the checksum of the real answer", async () => {
     configure({ cacheDir: TILES, download: false });
-    const expected = (await whereAmI(51.25, 2.85)).reduce((sum, z) => sum + z.mrgid, 0);
+    const expected = digest(await whereAmI(51.25, 2.85));
     const result = measure("offline", "whereAmI/off-ostend");
     expect(result).toMatchObject({ name: "whereAmI/off-ostend", mode: "offline", checksum: expected });
     expect(result.samplesMs).toHaveLength(1);

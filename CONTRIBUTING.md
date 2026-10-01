@@ -48,11 +48,11 @@ A separate CI job benchmarks the queries when `src/`, `benchmarks/`, the depende
 Benchmark the working tree against a git revision:
 
 ```sh
-gh release download "v$(node -p "require('./package.json').version")" -p tiles.json -p zones.json -D dist
+gh release download -p tiles.json -p zones.json -D dist
 node benchmarks/run.ts --base origin/main
 ```
 
-The first line is only needed without a local build: the reader checks tiles against the hashes in `dist/tiles.json`, so it must be the release's copy. The command measures uncommitted edits too. Omit `--base` to compare against `HEAD`.
+The first line is only needed without a local build: the reader checks tiles against the hashes in `dist/tiles.json`, so it must be a release's copy. Tiles are downloaded from the release named by `package.json`; between a version bump and its release, pass `--release v<newest>` to use the release the metadata came from, which is what CI always does. The command measures uncommitted edits too. Omit `--base` to compare against `HEAD`.
 
 Each workload in [`benchmarks/cases.json`](benchmarks/cases.json) is one query at one position, and runs in two modes. `offline` calls the public API over tiles in the cache, the way a Node consumer does. `range` drives the shared query code in `src/queries.ts` over HTTP range reads of the compressed tiles from a local server, the way the browser demo does, and also counts the requests and bytes one call makes. Pass `--mode offline` or `--mode range` to run one, and `--skip` with a regular expression matched against workload names to leave some out. Bases older than `src/queries.ts` only run offline.
 

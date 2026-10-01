@@ -22,12 +22,13 @@ const { values } = parseArgs({
     threshold: { type: "string", default: "20" },
     skip: { type: "string" },
     cache: { type: "string" },
+    release: { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
 if (values.help) {
   console.log(
-    "Usage: node benchmarks/run.ts [--base git-ref] [--mode offline|range|both] [--output directory] [--threshold percent] [--skip name-regex] [--cache tile-directory]",
+    "Usage: node benchmarks/run.ts [--base git-ref] [--mode offline|range|both] [--output directory] [--threshold percent] [--skip name-regex] [--release tag] [--cache tile-directory]",
   );
   process.exit(0);
 }
@@ -58,18 +59,20 @@ const git = (...args: string[]) => capture("git", args);
 const baseRevision = git("rev-parse", "--verify", "--end-of-options", `${values.base}^{commit}`);
 const revision = git("rev-parse", "HEAD");
 const dirty = git("status", "--porcelain").length > 0;
-const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
-// Mirrors the reader's default cache in src/store.ts, so a developer's queries and benchmarks share tiles.
+// A version bump lands before its release exists, so the tiles may have to come from an older tag.
+const tag = values.release ?? `v${JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version}`;
+assert.match(tag, /^v\d+\.\d+\.\d+/, "Invalid release tag");
+// Mirrors the reader's defaults in src/store.ts, so a developer's queries and benchmarks share tiles.
+const baseUrl = `https://github.com/openwatersio/maritime-zones/releases/download/${tag}`;
 const cacheDir = resolve(
-  values.cache ??
-    join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "openwaters", "maritime-zones", `v${version}`),
+  values.cache ?? join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "openwaters", "maritime-zones", tag),
 );
 const output = resolve(values.output ?? join(root, ".benchmarks", new Date().toISOString().replaceAll(":", "-")));
 mkdirSync(output, { recursive: true });
 const temp = mkdtempSync(join(tmpdir(), "maritime-zones-bench-"));
 const baseline = join(temp, "source");
 const hash = createHash("sha256");
-for (const path of ["cases.json", "measure.ts", "range-server.ts", "run.ts", "compare.ts"]) {
+for (const path of ["cases.json", "measure.ts", "digest.ts", "range-server.ts", "run.ts", "compare.ts"]) {
   hash.update(path).update(readFileSync(join(bench, path)));
 }
 const harness = hash.digest("hex");
@@ -118,7 +121,7 @@ try {
   // 480 NM is MAX_RADIUS in src/queries.ts.
   console.error("Caching tiles...");
   const api = await import(pathToFileURL(join(root, "src", "index.ts")).href);
-  api.configure({ cacheDir });
+  api.configure({ cacheDir, baseUrl });
   for (const { lat, lon } of selected) await api.download({ lat, lon, radiusNm: 480 });
 
   const reports: Record<"base" | "candidate", Report> = {

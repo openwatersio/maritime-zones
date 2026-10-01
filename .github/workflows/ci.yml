@@ -45,17 +45,22 @@ jobs:
           cache: npm
       - if: steps.changes.outputs.run == 'true'
         run: npm ci
-      # The reader checks tiles against these hashes, so they must come from the release it downloads from.
+      # The newest release, because a version bump lands before its release exists.
+      # The reader checks tiles against these hashes, so both files must come from the same release as the tiles.
       - if: steps.changes.outputs.run == 'true'
-        run: gh release download "v$(node -p "require('./package.json').version")" -p tiles.json -p zones.json -D dist
+        name: Tile metadata from the newest release
+        run: |
+          TAG=$(gh release view --json tagName -q .tagName)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          gh release download "$TAG" -p tiles.json -p zones.json -D dist
       - if: steps.changes.outputs.run == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/openwaters/maritime-zones
-          key: tiles-${{ hashFiles('package.json', 'benchmarks/cases.json') }}
+          key: tiles-${{ env.TAG }}-${{ hashFiles('benchmarks/cases.json') }}
       - if: steps.changes.outputs.run == 'true'
         name: Compare base and candidate on the same runner
-        run: node benchmarks/run.ts --base "$BASE" --output benchmark-results
+        run: node benchmarks/run.ts --base "$BASE" --release "$TAG" --output benchmark-results
       - if: always() && steps.changes.outputs.run == 'true'
         name: Publish timing table
         run: cat benchmark-results/summary.md >> "$GITHUB_STEP_SUMMARY"

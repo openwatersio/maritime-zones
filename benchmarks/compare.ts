@@ -63,7 +63,6 @@ export function validate(report: Report): void {
   }
 }
 
-const same = (a: number, b: number) => Math.abs(a - b) <= Math.max(1, Math.abs(a)) * 1e-9;
 const mb = (n: number) => `${(n / 1e6).toFixed(2)} MB`;
 
 export function compare(base: Report, candidate: Report, threshold = 20): { regressed: boolean; markdown: string } {
@@ -86,7 +85,7 @@ export function compare(base: Report, candidate: Report, threshold = 20): { regr
   let regressed = false;
   for (const current of candidate.results) {
     const previous = base.results.find((r) => key(r) === key(current))!;
-    assert.ok(same(current.checksum, previous.checksum), `Workload output changed: ${key(current)}`);
+    assert.equal(current.checksum, previous.checksum, `Workload output changed: ${key(current)}`);
     const before = median(previous.samplesMs);
     const after = median(current.samplesMs);
     const change = (after / before - 1) * 100;

@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { digest } from "./digest.ts";
 import { serveRanges } from "./range-server.ts";
 
 console.debug = () => {}; // flatgeobuf logs every index node it visits
@@ -54,26 +55,28 @@ if (mode === "offline") {
 }
 
 const { lat, lon, iso } = spec;
-const distance = (hit: { distanceNm: number } | null) => (hit ? hit.distanceNm : -1);
-const work: () => Promise<number> = {
-  whereAmI: async () => (await api.whereAmI(lat, lon)).reduce((sum: number, z: { mrgid: number }) => sum + z.mrgid, 0),
-  nearestTerritory: async () => distance(await api.nearestTerritory(lat, lon)),
-  distanceTo: async () => distance(await api.distanceTo(lat, lon, iso)),
-  distanceToLand: async () => distance(await api.distanceToLand(lat, lon)),
+const work: () => Promise<any> = {
+  whereAmI: () => api.whereAmI(lat, lon),
+  nearestTerritory: () => api.nearestTerritory(lat, lon),
+  distanceTo: () => api.distanceTo(lat, lon, iso),
+  distanceToLand: () => api.distanceToLand(lat, lon),
 }[spec.query as string]!;
 assert.ok(work, `Unknown query: ${spec.query}`);
+// Consumes each timed answer without hashing it inside the measurement.
+const sink = (answer: any) => (Array.isArray(answer) ? answer.length : answer ? answer.distanceNm : -1);
 
 // The first call also pays for loading tiles; its requests and bytes are what one browser query costs.
-const checksum = await work();
-assert.ok(Number.isFinite(checksum), `${name}: invalid output`);
+const first = await work();
+const checksum = digest(first);
+const expected = sink(first);
 const { requests, bytes } = counters;
 
 const batch = async (n: number) => {
   let sum = 0;
   const start = performance.now();
-  for (let i = 0; i < n; i++) sum += await work();
+  for (let i = 0; i < n; i++) sum += sink(await work());
   const elapsed = performance.now() - start;
-  assert.ok(Math.abs(sum / n - checksum) <= Math.max(1, Math.abs(checksum)) * 1e-9, `${name}: output changed`);
+  assert.ok(Math.abs(sum / n - expected) <= Math.max(1, Math.abs(expected)) * 1e-9, `${name}: output changed`);
   return elapsed;
 };
 const warmup = performance.now();
@@ -82,6 +85,7 @@ while (performance.now() - warmup < suite.warmupMs);
 let n = iterations ?? 1;
 if (iterations === undefined) while ((await batch(n)) < suite.sampleMs) n *= 2;
 const sample = (await batch(n)) / n;
+assert.equal(digest(await work()), checksum, `${name}: output changed during measurement`);
 await server?.close();
 console.log(
   JSON.stringify({ name, mode, iterations: n, checksum, samplesMs: [sample], ...(server && { requests, bytes }) }),
