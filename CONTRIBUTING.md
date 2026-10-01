@@ -117,7 +117,7 @@ The reply approves the proposed derived-tile redistribution and monthly load. VL
 
 The source confirmation names `worldcountries_esri_2014`, not `land_v9`. World Countries is a proxy for normal baselines. Country rings include inland borders and holes, and the build does not model straight or archipelagic legal baselines, low-water observations or discharge rules. Redistribution permission does not change the navigation or legal-use limitations.
 
-The World Countries build is version `0.2.0`. Publish it as a new tiles release after reviewing `upstream.lock.json`, rebuilding, running `npm test` and `node scripts/check.ts`, and checking the new tile counts, sizes and hashes. Require 0 zone mismatches and distance errors under 1%. Verify the fresh-cache Belgian query and Pages range reads against that release's metadata. Keep `v0.1.0` and its OSM assets unchanged: changing coastlines changes hashes, and caches are separated by version. Releases containing OSM data retain their own attribution and ODbL terms. npm publication is authorized and follows the matching tile release.
+World Countries tiles ship from `v0.2.0`. A release built from new coastline data needs the same review as any other: `upstream.lock.json`, a rebuild, `npm test`, `node scripts/check.ts` with 0 zone mismatches and distance errors under 1%, and the new tile counts, sizes and hashes. `v0.1.0` and its OSM assets stay unchanged: changing coastlines changes hashes, and caches are separated by version. Releases containing OSM data retain their own attribution and ODbL terms.
 
 ## Releases
 
@@ -139,7 +139,9 @@ VLIZ has approved the proposed derived-tile redistribution through GitHub releas
 
 ### npm publication
 
-The first public package is `@openwaters/maritime-zones@0.2.0`. Publish the `v0.2.0` tiles first, then run these checks from the reviewed package commit:
+`@openwaters/maritime-zones` is published after its tiles: once the **Release tiles** run has finished, dispatch **Publish npm package** on `main`. It verifies packaging and publishes `v<package version>` through npm trusted publishing with provenance; no npm token is stored in GitHub. The trusted publisher on npmjs.com is owner `openwatersio`, repository `maritime-zones`, workflow `publish.yml`, no environment. Releases created with the tile workflow's `GITHUB_TOKEN` do not trigger other workflows, which is why the dispatch is explicit; a release published by a human triggers it at the release tag. Verify the workflow result and `npm view @openwaters/maritime-zones version` before reporting a publication complete.
+
+To publish by hand instead, for example while the trusted publisher is not registered, run these from the reviewed commit with a maintainer's npm login and two-factor code:
 
 ```sh
 npm ci
@@ -148,12 +150,10 @@ npx tsc -p .
 npx vitest run test/regulations.test.ts test/package.test.ts
 npm pack --dry-run
 npm run package:check
-npm publish
+npm publish --otp=<code>
 ```
 
-The first publish needs a maintainer's npm login and two-factor authentication. Register npm's GitHub Actions trusted publisher after the package exists: owner `openwatersio`, repository `maritime-zones`, workflow `publish.yml`, no environment. No npm token is stored in GitHub. The tile tag is required before this manual npm publish; do not recreate it or republish the immutable tiles afterward.
-
-For later versions, publish the matching tiles, then dispatch **Publish npm package** on `main`. It verifies packaging and publishes with OIDC and provenance. A release published by a human also triggers it at the release tag; releases created with the tile workflow's `GITHUB_TOKEN` do not trigger another workflow, so they require the explicit dispatch. Never dispatch the npm workflow for the hand-published first version. Verify the workflow result and `npm view @openwaters/maritime-zones version` before reporting a publication complete.
+Never dispatch the npm workflow for a version that was published by hand; it fails on the existing version.
 
 Enable GitHub Pages with GitHub Actions as its source before publishing. The mirror serves the latest release at `https://openwatersio.github.io/maritime-zones/v<version>/`, with the same filenames and SHA-256 as the release. Set `baseUrl` to that URL for whole-tile downloads. For browser range queries, host the demo on the same Pages origin and use FlatGeobuf with `seekableZstd: true`; Pages does not expose the `Content-Range` header to other origins. See [Tile format](docs/tile-format.md).
 
