@@ -31,10 +31,14 @@ try {
     files.every((file) => /^(lib\/|dist\/(zones|tiles)\.json$|package\.json$|README\.md$|NOTICE$|LICENSE$)/.test(file)),
   );
   assert.doesNotMatch(readFileSync(join(ROOT, "lib/index.js"), "utf8"), /console\.debug\(/);
-  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", join(work, pack.filename)], {
-    cwd: work,
-    stdio: "pipe",
-  });
+  execFileSync(
+    "npm",
+    ["install", "--install-strategy=nested", "--ignore-scripts", "--no-audit", "--no-fund", join(work, pack.filename)],
+    {
+      cwd: work,
+      stdio: "pipe",
+    },
+  );
   execFileSync(
     process.execPath,
     [

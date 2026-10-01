@@ -52,12 +52,16 @@
     "demo:dev": "node scripts/build-demo.ts --serve"
   },
   "dependencies": {
-    "flatgeobuf": "^4.5.0"
+    "@bokuweb/zstd-wasm": "0.0.27",
+    "@repeaterjs/repeater": "3.1.0",
+    "flatbuffers": "25.9.23",
+    "slice-source": "0.4.1"
   },
   "devDependencies": {
     "@types/leaflet": "1.9.21",
     "@types/node": "^26.6.3",
     "esbuild": "0.28.2",
+    "flatgeobuf": "^4.5.0",
     "leaflet": "1.9.4",
     "prettier": "^3.9.9",
     "typescript": "^7.0.2",

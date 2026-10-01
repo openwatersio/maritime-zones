@@ -44,7 +44,7 @@ npm pack --dry-run --ignore-scripts
 npm run package:check
 ```
 
-CI does not run the full vitest suite, because the query tests need built tiles, and building them downloads every layer from VLIZ. The packaging smoke test uses the newest released metadata as a fixture and skips prepack, so CI can run before the package version's tile release exists. Its installed consumer calls `tilesFor()` without network access, and TypeScript checks the shipped declarations. Publishing always runs prepack against the exact version's release. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
+CI does not run the full vitest suite, because the query tests need built tiles, and building them downloads every layer from VLIZ. The packaging smoke test uses the newest released metadata as a fixture and skips prepack, so CI can run before the package version's tile release exists. It installs with npm's nested strategy to catch undeclared runtime imports, calls `tilesFor()` without network access, and checks the shipped declarations with TypeScript. Publishing always runs prepack against the exact version's release. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
 
 A separate CI job benchmarks the queries when `src/`, `benchmarks/`, the dependencies or the workflow change. It uses the released tiles, so it needs no build.
 

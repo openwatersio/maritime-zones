@@ -22,7 +22,7 @@ ${sizes.length} seekable zstd tiles (256 KiB frames, level 19), ${mb(sizes.reduc
 
 Zone and boundary features: Marine Regions Maritime Boundaries Geodatabase (Flanders Marine Institute), CC-BY 4.0. Land features: Flanders Marine Institute (2020). [World Countries Geodatabase](https://marineinfo.org/doc/dataset/8873), CC-BY 4.0, adapted from ESRI World Countries 2014 with DeLorme (2014) source data. Country polygon rings come from MarineRegions:worldcountries_esri_2014 and include inland borders and holes. The source hashes are recorded in upstream.lock.json. Marine Regions land_v9 is not used.
 
-VLIZ has approved derived-tile redistribution and the monthly upstream-check load. Maintainers monitor Marine Regions updates to avoid distributing deprecated versions. World Countries supplies a proxy for normal baselines, not a complete legal-baseline model. The v0.1.0 release uses OpenStreetMap coastlines and retains its own NOTICE and ODbL 1.0 terms. The package remains private and is not published to npm.
+VLIZ has approved derived-tile redistribution and the monthly upstream-check load. Maintainers monitor Marine Regions updates to avoid distributing deprecated versions. World Countries supplies a proxy for normal baselines, not a complete legal-baseline model. The v0.1.0 release uses OpenStreetMap coastlines and retains its own NOTICE and ODbL 1.0 terms. npm publication is authorized and follows the matching tile release; see CONTRIBUTING.md for publishing instructions.
 
 ${Object.values(lock)
   .map(({ title, features }) => `- ${title}: ${features} ${features === 1 ? "feature" : "features"}`)

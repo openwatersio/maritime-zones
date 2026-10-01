@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ROOT } from "./layers.ts";
 
 export async function releaseMetadata(version: string) {
@@ -18,7 +19,7 @@ export async function releaseMetadata(version: string) {
   );
 }
 
-if (import.meta.main) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { version } = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
   const files = await releaseMetadata(version);
   await mkdir(join(ROOT, "dist"), { recursive: true });
