@@ -18,7 +18,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     permissions:
       contents: write
     env:
@@ -48,7 +48,7 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           # Consumers cache tiles by version and check them against the hashes
           # shipped with that version, so a published release is never replaced.
-          if gh release view "$TAG" > /dev/null 2>&1; then
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null)" = "false" ]; then
             echo "::error::Release $TAG already exists. Bump the version in package.json to release new tiles."
             exit 1
           fi
@@ -75,15 +75,17 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: |
           # Draft first, so nobody sees a release with half its tiles.
-          gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
-          gh release upload "$TAG" dist/zones.json dist/tiles.json NOTICE dist/tiles/*.fgb.zst
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          node scripts/upload-release.ts "$TAG"
           EXPECTED=$(node -p "Object.keys(require('./dist/tiles.json').tiles).length + 3")
           UPLOADED=$(gh release view "$TAG" --json assets --jq '.assets | length')
           if [ "$UPLOADED" -ne "$EXPECTED" ]; then
             echo "::error::Uploaded $UPLOADED of $EXPECTED assets; leaving $TAG as a draft."
             exit 1
           fi
-          gh release edit "$TAG" --draft=false
+          gh release edit "$TAG" --draft=false --target "$GITHUB_SHA" --notes-file "$RUNNER_TEMP/notes.md"
 
       - name: Verify a query from a fresh release cache
         if: ${{ !inputs.dry_run }}

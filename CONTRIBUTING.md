@@ -50,6 +50,8 @@ To release:
 2. Bump `version` in `package.json` in a pull request.
 3. Run the **Release tiles** workflow from the Actions tab. It fetches the maritime boundaries from VLIZ (about 30 minutes) and the OSM coastlines (about 925 MB), builds and compresses the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads every compressed tile plus both metadata files and NOTICE, checks the count, publishes, verifies a query from an empty cache and deploys the identical files to Pages.
 
+Uploads are spaced eight seconds apart to stay below [GitHub's content-creation limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), so uploading a full global build takes about 80 minutes. Rate limits honor GitHub's retry delay, with bounded backoff. If a run stops with a draft, rerun the workflow: it checks every existing asset's hash and uploads only missing files. If those hashes differ, delete the draft and start again. Published releases cannot be resumed or replaced.
+
 The npm package must carry the `zones.json` and `tiles.json` from the release it points at; take them from the release rather than rebuilding.
 
 The package remains `private: true` and is not published to npm. Marine Regions asks that its products not be offered for download elsewhere; confirmation of derived-tile redistribution is pending with VLIZ. Releases are experimental and may be removed if VLIZ declines. The coastline comes from OpenStreetMap under ODbL 1.0; `land_v9` is not fetched or built.
