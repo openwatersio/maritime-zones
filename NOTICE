@@ -1,6 +1,6 @@
 @openwaters/maritime-zones
 
-The code in this package is MIT licensed (see LICENSE). The zone and boundary features in dist/ are derived from the Marine Regions Maritime Boundaries Geodatabase, published by the Flanders Marine Institute (VLIZ) under the Creative Commons Attribution 4.0 International licence (https://creativecommons.org/licenses/by/4.0/).
+The code in this package is MIT licensed (see LICENSE). The zone and boundary features in dist/ are derived from the Marine Regions Maritime Boundaries Geodatabase. Land features are derived from the World Countries Geodatabase. Both datasets are published by the Flanders Marine Institute (VLIZ) under the Creative Commons Attribution 4.0 International licence (https://creativecommons.org/licenses/by/4.0/).
 
 Changes: polygons are rounded to 1e-5 degrees and subdivided into small pieces; zone rings are split into short lines; attributes are renamed and reduced. Features are stored together in 10° FlatGeobuf tiles compressed as seekable zstd.
 
@@ -18,6 +18,8 @@ Flanders Marine Institute (2023). Maritime Boundaries Geodatabase: Maritime Boun
 
 Flanders Marine Institute (2024). Maritime Boundaries Geodatabase: High Seas, version 2. Available online at https://www.marineregions.org/. https://doi.org/10.14284/696
 
-Coastline features (kind=land): © OpenStreetMap contributors, available under the Open Database License (ODbL) 1.0: https://opendatacommons.org/licenses/odbl/1-0/. Derived from the WGS84 coastline lines at https://osmdata.openstreetmap.de/data/coastlines.html. The source archive URL and SHA-256 are recorded in upstream.lock.json. Coordinates are simplified at 0.0001°, rounded to 1e-5 degrees and split into short lines. The derived coastline data in the tiles is available under ODbL 1.0; zone and boundary features retain their CC-BY 4.0 licence. Attribution: https://www.openstreetmap.org/copyright.
+Flanders Marine Institute (2020). World Countries Geodatabase. https://marineinfo.org/doc/dataset/8873
 
-Redistribution confirmation for the derived Marine Regions tiles is pending with VLIZ. This experimental release may be removed if VLIZ declines. Marine Regions land_v9 is not used.
+Land features (kind=land) use the updated World Countries Geodatabase from the Marine Regions WFS layer MarineRegions:worldcountries_esri_2014. This dataset adapts ESRI World Countries 2014, with source data from DeLorme (2014), to be consistent with Marine Regions maritime boundaries. Original source attribution: ESRI and DeLorme (2014), https://www.esri.com/. Country polygon rings are rounded to 1e-5 degrees, simplified at 0.0001° and split into short lines. They include inland borders and holes and are a proxy for normal baselines, not a complete legal-baseline model. Their upstream title, feature count and SHA-256 are recorded in upstream.lock.json. Marine Regions land_v9 is not used.
+
+VLIZ has approved redistribution of the derived tiles. Maintainers monitor Marine Regions updates to avoid distributing deprecated versions. The permission scope and update process are recorded in CONTRIBUTING.md. This NOTICE describes the World Countries build; releases containing OpenStreetMap data retain their own NOTICE and ODbL 1.0 terms.

@@ -4,7 +4,7 @@
  * hash in upstream.lock.json. The monthly update workflow opens a PR when the
  * lock changes.
  *
- * Features are fetched one mrgid at a time: whole layers at full resolution
+ * Features are fetched one at a time: whole layers at full resolution
  * are hundreds of megabytes and the WFS times out on them.
  *
  *   npm run fetch            # reuse tmp/ cache
@@ -13,13 +13,13 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { LAYERS, LOCK, TMP, WFS } from "./layers.ts";
+import { LAND, LAYERS, LOCK, TMP, WFS } from "./layers.ts";
 
 const fresh = process.argv.includes("--fresh");
 if (fresh) rmSync(TMP, { recursive: true, force: true });
 const started = Date.now();
 const wfs = { requests: 0, retries: 0, responseBytes: 0, elapsedSeconds: 0 };
-// Keep partial load figures when fetching or coastline conversion fails.
+// Keep partial load figures when fetching fails.
 process.on("exit", (code) => {
   const finished = Date.now();
   mkdirSync(TMP, { recursive: true });
@@ -66,7 +66,7 @@ async function cached(file: string, query: string): Promise<string> {
 const capabilities = await get("request=GetCapabilities");
 const lock: Record<string, { title: string; features: number; sha256: string }> = {};
 
-for (const { typeName, key, idField = "mrgid" } of LAYERS) {
+for (const { typeName, key, idField = "mrgid" } of [...LAYERS, LAND]) {
   const title = capabilities.match(new RegExp(`<Name>MarineRegions:${typeName}</Name><Title>([^<]*)</Title>`))?.[1];
   if (!title) throw new Error(`GetCapabilities has no layer ${typeName}`);
 
@@ -77,14 +77,17 @@ for (const { typeName, key, idField = "mrgid" } of LAYERS) {
     ),
   );
   const ids: string[] = list.features
-    .map((f: { properties: Record<string, number> }) => `${idField}=${f.properties[idField]}`)
+    // Country territory IDs are not unique; WFS feature IDs preserve every polygon.
+    .map((f: { id: string; properties: Record<string, number> }) =>
+      key === LAND.key ? f.id : `${idField}=${f.properties[idField]}`,
+    )
     .sort();
   const hash = createHash("sha256");
   for (const [i, id] of ids.entries()) {
     const name = id.replace(/[^\w.-]+/g, "_");
     const body = await cached(
       join(key, `${name}.json`),
-      `request=GetFeature&typeNames=MarineRegions:${typeName}&outputFormat=application/json&cql_filter=${encodeURIComponent(id)}`,
+      `request=GetFeature&typeNames=MarineRegions:${typeName}&outputFormat=application/json&${key === LAND.key ? "resourceID" : "cql_filter"}=${encodeURIComponent(id)}`,
     );
     // Hash the features only: every response carries a fresh timeStamp.
     hash.update(JSON.stringify(JSON.parse(body).features));
@@ -97,4 +100,3 @@ for (const { typeName, key, idField = "mrgid" } of LAYERS) {
 writeFileSync(LOCK, JSON.stringify(lock, null, 2) + "\n");
 console.log(`Wrote ${LOCK}`);
 wfs.elapsedSeconds = (Date.now() - started) / 1000;
-await import("./fetch-land.ts");

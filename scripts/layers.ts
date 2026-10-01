@@ -6,6 +6,7 @@ export const TMP = join(ROOT, "tmp");
 export const DIST = join(ROOT, "dist");
 export const LOCK = join(ROOT, "upstream.lock.json");
 export const WFS = "https://geo.vliz.be/geoserver/MarineRegions/wfs";
+export const LAND = { key: "countries", typeName: "worldcountries_esri_2014", idField: "mrgid_ter1" };
 
 /** Innermost first; whereAmI returns zones in this order. */
 export const LAYERS = [

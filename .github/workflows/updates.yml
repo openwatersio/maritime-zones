@@ -31,7 +31,7 @@ jobs:
       - name: Install GDAL
         run: sudo apt-get update && sudo apt-get install -y gdal-bin
       - run: npm ci
-      - name: Fetch maritime boundaries and OSM coastlines
+      - name: Fetch maritime boundaries and World Countries baselines
         id: fetch
         run: npm run fetch -- --fresh
       - name: Write load report and source changes

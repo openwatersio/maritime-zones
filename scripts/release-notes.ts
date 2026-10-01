@@ -20,9 +20,9 @@ console.log(`Maritime zone tiles for @openwaters/maritime-zones ${version}. The 
 
 ${sizes.length} seekable zstd tiles (256 KiB frames, level 19), ${mb(sizes.reduce((a, b) => a + b, 0))} in total. Sizes and SHA-256 cover the compressed downloads.
 
-Zone and boundary features: Marine Regions Maritime Boundaries Geodatabase (Flanders Marine Institute), CC-BY 4.0. Coastline features: © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The source archive is recorded in upstream.lock.json. Marine Regions land_v9 is not used.
+Zone and boundary features: Marine Regions Maritime Boundaries Geodatabase (Flanders Marine Institute), CC-BY 4.0. Land features: Flanders Marine Institute (2020). [World Countries Geodatabase](https://marineinfo.org/doc/dataset/8873), CC-BY 4.0, adapted from ESRI World Countries 2014 with DeLorme (2014) source data. Country polygon rings come from MarineRegions:worldcountries_esri_2014 and include inland borders and holes. The source hashes are recorded in upstream.lock.json. Marine Regions land_v9 is not used.
 
-This is an experimental release while VLIZ's confirmation of derived-tile redistribution is pending. The release and Pages mirror may be removed. The package remains private and is not published to npm.
+VLIZ has approved derived-tile redistribution and the monthly upstream-check load. Maintainers monitor Marine Regions updates to avoid distributing deprecated versions. World Countries supplies a proxy for normal baselines, not a complete legal-baseline model. The v0.1.0 release uses OpenStreetMap coastlines and retains its own NOTICE and ODbL 1.0 terms. The package remains private and is not published to npm.
 
 ${Object.values(lock)
   .map(({ title, features }) => `- ${title}: ${features} ${features === 1 ? "feature" : "features"}`)

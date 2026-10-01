@@ -53,7 +53,7 @@ jobs:
             exit 1
           fi
 
-      - name: Fetch maritime boundaries and OSM coastlines
+      - name: Fetch maritime boundaries and World Countries baselines
         run: npm run fetch
       - name: Check upstream matches the committed lock
         run: |

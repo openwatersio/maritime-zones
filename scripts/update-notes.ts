@@ -7,7 +7,7 @@ const stats = JSON.parse(readFileSync(join(TMP, "fetch-stats.json"), "utf8"));
 console.log(`Upstream check started ${stats.startedAt}.
 
 ${stats.wfs.requests} WFS requests, retries: ${stats.wfs.retries}, ${stats.wfs.responseBytes} response bytes (UTF-8, after HTTP decompression).
-WFS fetch: ${stats.wfs.elapsedSeconds ?? stats.elapsedSeconds} seconds. Full fetch including OSM download/conversion: ${stats.elapsedSeconds} seconds.
+WFS fetch: ${stats.wfs.elapsedSeconds ?? stats.elapsedSeconds} seconds. Full fetch: ${stats.elapsedSeconds} seconds.
 
 ${stats.ok ? "Fetch succeeded." : "Fetch failed; load figures are partial. No update PR will be created."}
 `);

@@ -10,7 +10,7 @@
  *             not real boundaries.
  *   boundary  the real zone rings as LineStrings of at most CHUNK vertices,
  *             for distances.
- *   land      OpenStreetMap coastline lines, chunked the same way.
+ *   land      World Countries polygon rings, chunked the same way.
  *
  * Features are not clipped at tile edges: each one goes into every tile its
  * bbox touches, so a query that reads the tiles under its search box sees
@@ -24,11 +24,10 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, createReadStream, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createInterface } from "node:readline";
 import { TILE, tiles } from "../src/tiles.ts";
-import { DIST, LAYERS, TMP } from "./layers.ts";
+import { DIST, LAND, LAYERS, TMP } from "./layers.ts";
 
 const MAX_VERTICES = 256;
 const CHUNK = 256;
@@ -214,16 +213,10 @@ for (const { key } of LAYERS) {
   }
   console.log(`${key}: ${table.length} zones`);
 }
-for await (const line of createInterface({
-  input: createReadStream(join(TMP, "coastlines.geojsonl")),
-  crlfDelay: Infinity,
-})) {
-  if (!line) continue;
-  const { geometry } = JSON.parse(line);
-  if (geometry?.type !== "LineString") throw new Error("OSM coastline must be a LineString");
-  const points = simplify(geometry.coordinates.map(([x, y]: Point): Point => [round(x), round(y)]));
+for (const feature of features(LAND.key)) {
   // GDAL boundary filters need an integer zone field even in coastline-only tiles.
-  for (const part of chunk(points)) write({ kind: "land", zone: -1 }, "LineString", part);
+  for (const rings of polygons(feature.geometry))
+    for (const ring of rings) for (const line of chunk(ring)) write({ kind: "land", zone: -1 }, "LineString", line);
 }
 flush();
 

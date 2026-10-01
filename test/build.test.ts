@@ -8,7 +8,7 @@ import { zstdDecompressSync } from "node:zlib";
 import { deserialize } from "flatgeobuf/lib/mjs/geojson.js";
 import { expect, test } from "vitest";
 
-test("builds OSM coastline lines into seekable tiles and ignores the land_v9 cache", async () => {
+test("builds World Countries rings into seekable land tiles, outside the zone table", async () => {
   const work = mkdtempSync(join(tmpdir(), "maritime-zones-build-"));
   try {
     for (const file of [
@@ -24,7 +24,7 @@ test("builds OSM coastline lines into seekable tiles and ignores the land_v9 cac
     }
     writeFileSync(join(work, "package.json"), '{"type":"module","version":"0.1.0"}');
     symlinkSync(fileURLToPath(new URL("../node_modules", import.meta.url)), join(work, "node_modules"));
-    for (const key of ["internal", "archipelagic", "12nm", "24nm", "eez", "high_seas", "land"]) {
+    for (const key of ["internal", "archipelagic", "12nm", "24nm", "eez", "high_seas", "land", "countries"]) {
       mkdirSync(join(work, "tmp", key), { recursive: true });
     }
     writeFileSync(
@@ -48,6 +48,46 @@ test("builds OSM coastline lines into seekable tiles and ignores the land_v9 cac
       }),
     );
     writeFileSync(
+      join(work, "tmp", "countries", "country.json"),
+      JSON.stringify({
+        features: [
+          {
+            properties: { territory1: "Fixture country" },
+            geometry: {
+              type: "MultiPolygon",
+              coordinates: [
+                [
+                  [
+                    [1, 1],
+                    [2, 1],
+                    [2, 2],
+                    [1, 2],
+                    [1, 1],
+                  ],
+                  [
+                    [1.2, 1.2],
+                    [1.4, 1.2],
+                    [1.4, 1.4],
+                    [1.2, 1.4],
+                    [1.2, 1.2],
+                  ],
+                ],
+                [
+                  [
+                    [3, 3],
+                    [4, 3],
+                    [4, 4],
+                    [3, 4],
+                    [3, 3],
+                  ],
+                ],
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    writeFileSync(
       join(work, "tmp", "coastlines.geojsonl"),
       JSON.stringify({
         type: "Feature",
@@ -55,8 +95,8 @@ test("builds OSM coastline lines into seekable tiles and ignores the land_v9 cac
         geometry: {
           type: "LineString",
           coordinates: [
-            [1, 1],
-            [2, 1],
+            [31, 31],
+            [32, 31],
           ],
         },
       }) + "\n",
@@ -64,6 +104,7 @@ test("builds OSM coastline lines into seekable tiles and ignores the land_v9 cac
     execFileSync(process.execPath, [join(work, "scripts/build.ts")]);
     const index = JSON.parse(readFileSync(join(work, "dist/tiles.json"), "utf8"));
     expect(Object.keys(index.tiles)).toEqual(["n0e0"]);
+    expect(JSON.parse(readFileSync(join(work, "dist/zones.json"), "utf8"))).toEqual([]);
     execFileSync("ogr2ogr", [
       "-f",
       "FlatGeobuf",
@@ -78,18 +119,33 @@ test("builds OSM coastline lines into seekable tiles and ignores the land_v9 cac
     expect(raw).toEqual(readFileSync(join(work, "dist/tiles/n0e0.fgb")));
     const features = [];
     for await (const feature of deserialize(new Uint8Array(raw))) features.push(feature);
-    expect(features).toMatchObject([
-      {
-        properties: { kind: "land", zone: -1 },
-        geometry: {
-          type: "LineString",
-          coordinates: [
-            [1, 1],
-            [2, 1],
-          ],
-        },
-      },
-    ]);
+    expect(features).toHaveLength(3);
+    expect(features.every((f) => f.properties?.kind === "land" && f.properties?.zone === -1)).toBe(true);
+    expect(features.map((f) => (f.geometry?.type === "LineString" ? f.geometry.coordinates : null))).toEqual(
+      expect.arrayContaining([
+        [
+          [1, 1],
+          [2, 1],
+          [2, 2],
+          [1, 2],
+          [1, 1],
+        ],
+        [
+          [1.2, 1.2],
+          [1.4, 1.2],
+          [1.4, 1.4],
+          [1.2, 1.4],
+          [1.2, 1.2],
+        ],
+        [
+          [3, 3],
+          [4, 3],
+          [4, 4],
+          [3, 4],
+          [3, 3],
+        ],
+      ]),
+    );
     const { configure, distanceToLand } = await import(pathToFileURL(join(work, "src/index.ts")).href);
     configure({ cacheDir: join(work, "dist/tiles"), download: false });
     const hit = await distanceToLand(1.01, 1.5);
