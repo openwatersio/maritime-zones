@@ -14,7 +14,6 @@ it("records actual WFS requests, response bytes and retries, including failed fe
   const dir = mkdtempSync(join(tmpdir(), "maritime-fetch-"));
   mkdirSync(join(dir, "scripts"));
   for (const file of ["fetch.ts", "layers.ts"]) copyFileSync(join(ROOT, "scripts", file), join(dir, "scripts", file));
-  writeFileSync(join(dir, "scripts/fetch-land.ts"), "export {};\n");
   let requests = 0;
   let bytes = 0;
   let fail = false;
@@ -31,9 +30,20 @@ it("records actual WFS requests, response bytes and retries, including failed fe
       res.statusCode = 503;
       body = "Unavailable";
     } else if (query.get("request") === "GetCapabilities") {
-      body = LAYERS.map(({ typeName }) => `<Name>MarineRegions:${typeName}</Name><Title>Café ${typeName}</Title>`).join(
-        "",
-      );
+      body = [...LAYERS, { typeName: "worldcountries_esri_2014" }]
+        .map(({ typeName }) => `<Name>MarineRegions:${typeName}</Name><Title>Café ${typeName}</Title>`)
+        .join("");
+    } else if (query.get("typeNames") === "MarineRegions:worldcountries_esri_2014") {
+      const countries = [1, 2].map((id) => ({
+        type: "Feature",
+        id: `worldcountries_esri_2014.${id}`,
+        geometry: null,
+        properties: { mrgid_ter1: 2237, title: `Country ${id}` },
+      }));
+      const features = query.has("propertyName")
+        ? countries
+        : countries.filter((f) => f.id === query.get("resourceID"));
+      body = JSON.stringify({ type: "FeatureCollection", features, timeStamp: Date.now() });
     } else {
       body = JSON.stringify({ features: [{ properties: { mrgid: 1, title: "Café" } }], timeStamp: Date.now() });
     }
@@ -52,9 +62,17 @@ it("records actual WFS requests, response bytes and retries, including failed fe
   const stats = () => JSON.parse(readFileSync(join(dir, "tmp/fetch-stats.json"), "utf8"));
   try {
     await fetch("--fresh");
-    expect(stats()).toMatchObject({ ok: true, wfs: { requests: 14, retries: 1, responseBytes: bytes } });
+    expect(stats()).toMatchObject({ ok: true, wfs: { requests: 17, retries: 1, responseBytes: bytes } });
     expect(stats().elapsedSeconds).toBeGreaterThan(0);
     const lock = readFileSync(join(dir, "upstream.lock.json"), "utf8");
+    expect(JSON.parse(lock).countries.features).toBe(2);
+    const countryCache = [1, 2].map((id) =>
+      JSON.parse(readFileSync(join(dir, "tmp/countries", `worldcountries_esri_2014.${id}.json`), "utf8")),
+    );
+    expect(countryCache.map((c) => c.features.map((f: { id: string }) => f.id))).toEqual([
+      ["worldcountries_esri_2014.1"],
+      ["worldcountries_esri_2014.2"],
+    ]);
     requests = bytes = 0;
     await fetch();
     expect(stats()).toMatchObject({ ok: true, wfs: { requests: 1, retries: 0, responseBytes: bytes } });

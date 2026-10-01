@@ -6,15 +6,15 @@ Offline answers to four questions about a position at sea: which maritime zones 
 
 ## Status
 
-The tiles release is experimental while VLIZ confirms whether derived maritime-boundary tiles may be redistributed. The release and Pages mirror may be removed if VLIZ declines. Coastlines come from OpenStreetMap under ODbL 1.0; Marine Regions `land_v9` is not used. The package remains private and is not published to npm. See NOTICE for attribution and licences.
+VLIZ has approved redistribution of the derived tiles and the monthly upstream-check load. Maintainers monitor source updates to avoid distributing deprecated versions. Coastlines use the updated World Countries Geodatabase served as `MarineRegions:worldcountries_esri_2014`, the normal-baseline source identified by Marine Regions, under CC-BY 4.0. The package remains private and is not published to npm. See NOTICE for attribution and licences.
 
-The [coastline source and VLIZ reply guide](CONTRIBUTING.md#coastline-source-and-vliz-reply) explains the v9 workaround, the confirmations needed to restore v9 and the release steps for switching sources.
+The [coastline source and VLIZ reply guide](CONTRIBUTING.md#coastline-source-and-vliz-reply) records the permission scope, source citation and release procedure. The published `v0.1.0` tiles use OpenStreetMap coastlines under ODbL 1.0; the World Countries build is version `0.2.0` and requires a new tiles release.
 
 ## Map demos
 
 Try the [interactive demos](https://openwatersio.github.io/maritime-zones/): move the marker, choose a sample position or enter coordinates to answer all four questions. Each view includes Browser and Node.js code examples and its raw result. The browser reads byte ranges from the published tiles on the same Pages origin.
 
-The main black-water example combines `whereAmI()` and `distanceToLand()` with a caller-supplied Canadian 3 NM distance rule in `demo/regulations.ts`, outside the package API. It checks only this illustrative threshold against the OSM coastline. Passing it does not authorize discharge: vessel requirements, local restrictions and the regulation's legal definition of shore still need checking. See [Canada's section 96](https://laws-lois.justice.gc.ca/eng/regulations/SOR-2012-69/section-96.html). Other countries and ambiguous territory contexts return unresolved.
+The main black-water example combines `whereAmI()` and `distanceToLand()` with a caller-supplied Canadian 3 NM distance rule in `demo/regulations.ts`, outside the package API. It checks only this illustrative threshold against the coastline in the selected tile release. Passing it does not authorize discharge: vessel requirements, local restrictions and the regulation's legal definition of shore still need checking. See [Canada's section 96](https://laws-lois.justice.gc.ca/eng/regulations/SOR-2012-69/section-96.html). Other countries and ambiguous territory contexts return unresolved.
 
 ## Usage
 
@@ -82,21 +82,21 @@ Queries never answer from partial data. A tile they can't get throws an error th
 | Contiguous zone     | Contiguous Zones (24 NM) v4           | 220      |
 | EEZ                 | Exclusive Economic Zones (200 NM) v12 | 285      |
 | High seas           | High Seas v2                          | 1        |
-| Coastline           | OpenStreetMap coastline lines, WGS84  | 879,204  |
+| Coastline           | World Countries Geodatabase (2020)    | 294      |
 
-`upstream.lock.json` records each layer's title, feature count and content hash as served by the VLIZ WFS, plus the OSM coastline archive URL and SHA-256. The build simplifies rings with Douglas–Peucker at 0.0001° (about 11 m), so boundaries of neighboring zones can open slivers up to that width.
+`upstream.lock.json` records each layer's title, feature count and content hash as served by the VLIZ WFS. World Countries is cited as Flanders Marine Institute (2020). World Countries Geodatabase. https://marineinfo.org/doc/dataset/8873. It adapts ESRI World Countries 2014, with source data from DeLorme (2014). The build simplifies rings with Douglas–Peucker at 0.0001° (about 11 m), so boundaries of neighboring zones can open slivers up to that width.
 
-Each tile holds zone polygons subdivided into pieces of at most 256 vertices for point lookups, zone rings as lines for distances, and OSM coastline lines. Features are not clipped at tile edges; each one is written to every tile its bounding box touches. `zones.json` holds each zone's attributes once, and tile features refer to it by index. The 586 tiles total 282 MB compressed; the median tile is 0.06 MB and the largest is 10.2 MB. The release's `tiles.json` records each compressed download size and SHA-256; [Tile format](docs/tile-format.md) documents the compression measurements.
+Each tile holds zone polygons subdivided into pieces of at most 256 vertices for point lookups, zone rings as lines for distances, and World Countries rings as land-distance lines. Features are not clipped at tile edges; each one is written to every tile its bounding box touches. `zones.json` holds each zone's attributes once, and tile features refer to it by index. Country rings include inland borders and holes; the dataset is a proxy for normal baselines, not a complete legal-baseline model. The 636 tiles total 142 MB compressed; the median tile is 0.03 MB and the largest is 3.8 MB. The release's `tiles.json` records each compressed download size and SHA-256; [Tile format](docs/tile-format.md) documents the compression measurements.
 
 Coastline features use `zone: -1` so every tile has the same integer field for GDAL filters. That value has no entry in `zones.json`; `distanceToLand()` returns `zone: null`.
 
 ## Building
 
-Needs Node 24, GDAL (`ogr2ogr`) with FlatGeobuf support, curl and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5 (`brew install gdal t2sz` on macOS).
+Needs Node 24, GDAL (`ogr2ogr`) with FlatGeobuf support and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5 (`brew install gdal t2sz` on macOS).
 
 ```sh
 npm ci
-npm run fetch   # maritime boundaries from WFS and OSM coastlines into tmp/, cached; writes upstream.lock.json
+npm run fetch   # maritime boundaries and World Countries from WFS into tmp/, cached; writes upstream.lock.json
 npm run build   # tmp/ → dist/zones.json, dist/tiles.json, dist/tiles/*.fgb.zst
 npm test        # needs dist/; reads dist/tiles directly, offline
 ```
@@ -107,4 +107,4 @@ A release publishes the compressed tiles as flat release assets (`n40w130.fgb.zs
 
 ## Licence
 
-The code is MIT. Maritime zone and boundary features are CC-BY 4.0 from the Flanders Marine Institute. Coastline features are © OpenStreetMap contributors under ODbL 1.0. NOTICE has the citation and licence for each layer.
+The code is MIT. Maritime zone, boundary and World Countries features are CC-BY 4.0 from the Flanders Marine Institute. World Countries includes ESRI and DeLorme (2014) source data. The published `v0.1.0` release retains its OpenStreetMap attribution and ODbL 1.0 terms. NOTICE has the citation and licence for each layer.

@@ -29,10 +29,9 @@
     "features": 1,
     "sha256": "0a9072a4e05bdb9318887db4155cfd47dbd20a8ca6c3a029624a7ddd843b3a39"
   },
-  "land": {
-    "title": "OpenStreetMap coastlines (WGS84), ODbL 1.0",
-    "source": "https://osmdata.openstreetmap.de/download/coastlines-split-4326.zip",
-    "features": 879204,
-    "sha256": "50bc70f4982f472a05ebcdae2e776b8052e328ff83f2fffb5533650cd74afc88"
+  "countries": {
+    "title": "World countries (ESRI, 2014)",
+    "features": 294,
+    "sha256": "87646d6db75c5b30394a31819d5bb3eb207e5fb1d7fa4dbea43ee1c7eac68bda"
   }
 }

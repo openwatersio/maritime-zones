@@ -19,7 +19,6 @@ console.debug = () => {};
 configure({ cacheDir: join(DIST, "tiles"), download: false });
 const count = Number(process.argv[2] ?? 100);
 const work = mkdtempSync(join(tmpdir(), "maritime-zones-check-"));
-const zoneLayers = LAYERS.filter((l) => l.key !== "land");
 
 let seed = 1;
 const random = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
@@ -27,7 +26,7 @@ const random = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
 /** mrgids of every zone layer containing the point, per the WFS. */
 async function upstream(lat: number, lon: number): Promise<Set<string>> {
   const found = new Set<string>();
-  for (const { key, typeName } of zoneLayers) {
+  for (const { key, typeName } of LAYERS) {
     const filter = encodeURIComponent(`INTERSECTS(the_geom,POINT(${lon} ${lat}))`);
     const url = `${WFS}?service=WFS&version=1.0.0&request=GetFeature&typeName=MarineRegions:${typeName}&outputFormat=application/json&propertyName=mrgid&cql_filter=${filter}`;
     const response = await fetch(url);

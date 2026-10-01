@@ -204,7 +204,7 @@ async function run() {
       append(
         "p",
         assessment.rule
-          ? "At least 3 NM from the OSM coastline is required by this example rule."
+          ? "At least 3 NM from the dataset coastline is required by this example rule."
           : "This example provides a rule only for an unambiguous CAN territory context. No rule is supplied for this position.",
         rule,
       );
@@ -301,7 +301,7 @@ async function run() {
       showHit(
         hit,
         mode === "land"
-          ? "to the nearest OSM coastline"
+          ? "to the nearest coastline in the dataset"
           : hit?.zone
             ? `to ${zoneName(hit.zone)} · ${labels[hit.zone.layer]}`
             : "",
@@ -406,6 +406,10 @@ async function boot() {
     zoneTable = (await reader.metadata()).zones;
     element("version").textContent = `Tile data ${reader.version}`;
     element<HTMLAnchorElement>("notice-link").href = `./${reader.version}/NOTICE`;
+    element("coastline-attribution").innerHTML =
+      reader.version === "v0.1.0"
+        ? 'Coastlines: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, ODbL 1.0.'
+        : 'Coastlines: Flanders Marine Institute (2020). <a href="https://marineinfo.org/doc/dataset/8873">World Countries Geodatabase</a>, CC-BY 4.0; ESRI and DeLorme (2014) source data.';
     check.disabled = false;
     await run();
   } catch (error) {

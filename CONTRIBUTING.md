@@ -2,7 +2,7 @@
 
 ## Layout
 
-- `scripts/fetch.ts` downloads every layer from the VLIZ WFS into `tmp/`, one feature per request, and writes `upstream.lock.json`. `scripts/fetch-land.ts` downloads the ODbL OpenStreetMap coastline archive, records its hash in the same lock and streams its lines through GDAL.
+- `scripts/fetch.ts` downloads the maritime-zone layers and World Countries from the VLIZ WFS into `tmp/`, one feature per request, and writes `upstream.lock.json`. Zone features use their MRGIDs; country features use WFS feature IDs because territory IDs can be shared.
 - `scripts/build.ts` turns `tmp/` into `dist/zones.json`, `dist/tiles.json` and `dist/tiles/*.fgb.zst` (with raw `.fgb` intermediates for the GDAL distance oracle).
 - `scripts/layers.ts` lists the upstream layers and paths shared by the scripts.
 - `scripts/check.ts` compares answers at random points with the live WFS and with exact GDAL distances.
@@ -16,12 +16,12 @@
 
 ## Getting started
 
-Needs Node 24 (see `mise.toml`), GDAL with FlatGeobuf support for `ogr2ogr`, curl and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5. On macOS: `brew install gdal t2sz`.
+Needs Node 24 (see `mise.toml`), GDAL with FlatGeobuf support for `ogr2ogr` and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5. On macOS: `brew install gdal t2sz`.
 
 ```sh
 npm ci
-npm run fetch   # about 1,000 requests and 30 minutes the first time; cached in tmp/ after that
-npm run build   # about 4 minutes
+npm run fetch   # about 1,200 serial WFS requests the first time; cached in tmp/ after that
+npm run build
 npm test
 ```
 
@@ -70,47 +70,49 @@ CI compares a pull request with its base, or a push to `main` with the previous 
 
 ## Pages demos
 
-`demo/` contains the five map views, Browser and Node.js snippets, and the separate Canadian 3 NM example rule. `src/queries.ts` supplies the same geometry logic to the Node reader and browser range reader; regulations stay in the demo. Missing country rules, overlapping territory contexts and unknown distances do not produce a discharge decision. The example measures the OSM coastline, not a legal baseline, and does not model the remaining conditions in section 96.
+`demo/` contains the five map views, Browser and Node.js snippets, and the separate Canadian 3 NM example rule. `src/queries.ts` supplies the same geometry logic to the Node reader and browser range reader; regulations stay in the demo. Missing country rules, overlapping territory contexts and unknown distances do not produce a discharge decision. The example measures the coastline in the selected release and does not model legal baselines or the remaining conditions in section 96. Its attribution follows the selected release: OpenStreetMap for `v0.1.0`, World Countries for the `v0.2.0` build.
 
 To preview using the existing published tiles without fetching upstream data:
 
 ```sh
 npm ci
-npm run demo:build
+TILE_VERSION=v0.1.0 npm run demo:build
 mkdir -p public/v0.1.0
 gh release download v0.1.0 --dir public/v0.1.0
-npm run demo:dev
+TILE_VERSION=v0.1.0 npm run demo:dev
 ```
 
 Open `http://127.0.0.1:4173/`. The local server supports the suffix byte ranges the seekable reader requires. To preview a different release, download its assets into `public/<tag>/` and set `TILE_VERSION=<tag>` when building or starting the preview. For Node snippets, also download that release's `tiles.json` and `zones.json` into `dist/`.
 
-The **Deploy demos** workflow rebuilds Pages on relevant pushes to main, or on manual dispatch. It downloads the latest existing tile release and builds only the demo: no WFS requests, source rebuild, release replacement or npm publication. The release workflow also builds the demo when publishing new tiles. Both deployments preserve the experimental notice and source attribution. If VLIZ declines redistribution, disable the demo workflow along with taking down the mirror below; a subsequent push or manual run must not restore it.
+The **Deploy demos** workflow rebuilds Pages on relevant pushes to main, or on manual dispatch. It downloads the latest existing tile release and builds only the demo: no WFS requests, source rebuild, release replacement or npm publication. The release workflow also builds the demo when publishing new tiles. Both deployments preserve the navigation and discharge notice and the attribution for the selected tile release.
 
 ## Monthly upstream check
 
 The **Check upstream data** workflow runs from the default branch on the first of each month at 07:17 UTC. GitHub may delay scheduled runs. To measure a run sooner, select **Run workflow** in its Actions page or run `gh workflow run updates.yml`.
 
-Each run fetches the six Marine Regions layers serially with `npm run fetch -- --fresh`, then downloads and converts the OSM coastline archive. It compares `upstream.lock.json` with the committed version. Changed data is built and tested before the workflow opens or updates a single PR on `update-upstream`. The PR lists each changed layer's old and new title, feature count and hash. Unchanged data creates no PR. If an outstanding update reverts to the committed data, its PR is closed. No release, Pages deployment or npm publication occurs.
+Each run fetches the six maritime-zone layers and World Countries serially with `npm run fetch -- --fresh`. It compares `upstream.lock.json` with the committed version. Changed data is built and tested before the workflow opens or updates a single PR on `update-upstream`. The PR lists each changed layer's old and new title, feature count and hash. Unchanged data creates no PR. If an outstanding update reverts to the committed data, its PR is closed. No release, Pages deployment or npm publication occurs.
 
-The run summary and the `upstream-load` artifact retain the load report for 90 days, including partial figures on fetch failure. `tmp/fetch-stats.json` records start/end times, success, elapsed time, actual WFS request attempts, retries and response bytes. Cached features and indexes avoid WFS requests, but every invocation still fetches capabilities once, even with a full cache. Response bytes count UTF-8 response bodies after HTTP decompression, including HTTP error responses; they do not measure wire traffic or server CPU. WFS time includes retry waits; full-fetch time also includes the OSM download and GDAL conversion. OSM traffic is separate from the WFS counters.
+The run summary and the `upstream-load` artifact retain the load report for 90 days, including partial figures on fetch failure. `tmp/fetch-stats.json` records start/end times, success, elapsed time, actual WFS request attempts, retries and response bytes. Cached features and indexes avoid WFS requests, but every invocation still fetches capabilities once, even with a full cache. Response bytes count UTF-8 response bodies after HTTP decompression, including HTTP error responses; they do not measure wire traffic or server CPU. WFS time includes retry waits, and all source downloads are included in the WFS counters.
 
-With the current lock, a fresh check needs 879 WFS requests before retries: one capabilities request, six feature indexes and 872 individual features. The artifact records the actual count if upstream changes or retries occur. The WFS hashes ignore response timestamps, so an unchanged source does not produce an update just because it was fetched again. The OSM archive is hashed separately and is about 925 MB.
+With the current lock, a fresh check needs 1,174 WFS requests before retries: one capabilities request, seven feature indexes and 1,166 individual features (872 maritime zones and 294 country features). The artifact records the actual count if upstream changes or retries occur. The WFS hashes ignore response timestamps, so an unchanged source does not produce an update just because it was fetched again.
 
-Monthly checks are enabled at the maintainer's request while VLIZ's preference is pending in [issue #11](https://github.com/openwatersio/maritime-zones/issues/11). Share the run's report when discussing load. If VLIZ asks for less frequent fetching or a capabilities-first check, change the schedule or fetch strategy in a PR. If they ask us to stop, remove the schedule and avoid manual fetches until resolved. The v9 workaround below remains in force.
+VLIZ confirmed that the proposed monthly load is acceptable. Share the run's actual load report if the strategy or source coverage changes materially. If VLIZ asks for less frequent fetching or a capabilities-first check, change the schedule or fetch strategy in a PR. If they ask us to stop, remove the schedule and avoid manual fetches until resolved.
+
+Marine Regions announces releases through a newsletter sent to users who fill in their details through the download form. Maintainers should register there and review announcements alongside the monthly source comparison. The [LDES feed](https://www.marineregions.org/feed.ttl) also includes general gazetteer changes; a feed event is not necessarily a maritime-boundary release. An [hourly feed page](https://www.marineregions.org/feed.ttl?page=2026-09-30T22%3A00%3A00Z%2F2026-09-30T23%3A00%3A00Z) shows the time-window URL format. The monthly workflow compares the source features directly instead of interpreting every gazetteer event as a release.
 
 ## Coastline source and VLIZ reply
 
-Permission to use Marine Regions `land_v9` and its licence are unconfirmed, so coastlines come from OpenStreetMap under ODbL 1.0. `land_v9` is excluded from `scripts/layers.ts`; fetching and building ignore any cached `tmp/land/` files. `scripts/fetch-land.ts` downloads OSM's WGS84 coastline lines, and `scripts/build.ts` writes them as `kind: "land"` features for `distanceToLand()`. The six maritime-zone and boundary layers still come from Marine Regions. [Issue #11](https://github.com/openwatersio/maritime-zones/issues/11) tracks the questions sent to VLIZ.
+Coastlines use the updated World Countries Geodatabase served as `MarineRegions:worldcountries_esri_2014`. Britt Lonneville of the Marine Regions team identified it as the normal-baseline source used for maritime-zone calculations and supplied this citation:
 
-VLIZ's reply needs to answer two separate questions: whether we may use `land_v9`, with its applicable licence and attribution, and whether derived tiles may be offered for download through GitHub releases and Pages. Confirmation about the maritime-boundary layers alone does not settle `land_v9`.
+Flanders Marine Institute (2020). World Countries Geodatabase. https://marineinfo.org/doc/dataset/8873
 
-If redistribution is approved but v9 usage remains unclear or is declined, keep OSM coastlines and update the experimental status to reflect the reply's scope and conditions. If redistribution is declined, take down the release and Pages mirror using the commands below and distribute code for consumers to build locally. If both v9 usage and derived-tile redistribution are explicitly approved, restore v9 through a source-change PR:
+The [dataset record](https://marineinfo.org/doc/dataset/8873) specifies CC-BY 4.0 and describes ESRI World Countries 2014, with data from DeLorme (2014), adapted for consistency with the maritime boundaries. NOTICE preserves both the VLIZ citation and ESRI/DeLorme source attribution. The WFS cache uses `tmp/countries/`; `scripts/build.ts` simplifies and chunks every country polygon ring into `kind: "land", zone: -1` lines. Countries stay out of `zones.json`, and land-distance results retain `zone: null`. Cached `tmp/land/` and OSM coastline files are not used.
 
-1. Record the reply and its scope in issue #11, including the confirmed v9 licence and attribution requirements.
-2. Add `{ key: "land", typeName: "land_v9", idField: "id" }` to `scripts/layers.ts` and remove the OSM fetch import from `scripts/fetch.ts`. In `scripts/build.ts`, replace the OSM line stream with the v9 polygon-ring path: simplify and chunk every ring into `kind: "land", zone: -1` lines, and keep land out of `zones.json`. Preserve seekable zstd compression, compressed-byte hashes and the reader's `zone: null` land results.
-3. Fetch fresh source data and commit the new `upstream.lock.json`. Replace the OSM-only build regression with a v9 polygon fixture. Update NOTICE, README, these source instructions, release notes and workflow source labels to match the confirmed terms. OSM attribution remains part of releases containing OSM data.
-4. Rebuild, run `npm test` and `node scripts/check.ts`, and require 0 zone mismatches and distance errors under 1%. Review the new tile counts, sizes and hashes.
-5. Bump the package version and publish a new tiles release and Pages mirror. Verify the fresh-cache Belgian query and Pages range reads against that release's metadata. Keep `v0.1.0` and its OSM assets unchanged: changing coastlines changes hashes, and caches are separated by version. The package stays `private: true`; npm publication needs a separate decision.
+The reply approves the proposed derived-tile redistribution and monthly load. VLIZ explained that the download restrictions help prevent deprecated versions circulating and allow user tracking, and accepted that maintainers will watch for updates. [Issue #11](https://github.com/openwatersio/maritime-zones/issues/11) tracks the correspondence and usage notification. Marine Regions also invited a listing on its users page; the maintainer handles that reply and newsletter registration.
+
+The source confirmation names `worldcountries_esri_2014`, not `land_v9`. World Countries is a proxy for normal baselines. Country rings include inland borders and holes, and the build does not model straight or archipelagic legal baselines, low-water observations or discharge rules. Redistribution permission does not change the navigation or legal-use limitations.
+
+The World Countries build is version `0.2.0`. Publish it as a new tiles release after reviewing `upstream.lock.json`, rebuilding, running `npm test` and `node scripts/check.ts`, and checking the new tile counts, sizes and hashes. Require 0 zone mismatches and distance errors under 1%. Verify the fresh-cache Belgian query and Pages range reads against that release's metadata. Keep `v0.1.0` and its OSM assets unchanged: changing coastlines changes hashes, and caches are separated by version. Releases containing OSM data retain their own attribution and ODbL terms. The package stays `private: true`; npm publication needs a separate decision.
 
 ## Releases
 
@@ -122,17 +124,15 @@ To release:
 
 1. If either source has changed, run `npm run fetch -- --fresh` and commit the new `upstream.lock.json` in a pull request. The release workflow refuses to publish data that differs from the committed lock.
 2. Bump `version` in `package.json` in a pull request.
-3. Run the **Release tiles** workflow from the Actions tab. It fetches the maritime boundaries from VLIZ (about 30 minutes) and the OSM coastlines (about 925 MB), builds and compresses the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads every compressed tile plus both metadata files and NOTICE, checks the count, publishes, verifies a query from an empty cache and deploys the identical files to Pages.
+3. Run the **Release tiles** workflow from the Actions tab. It fetches the maritime boundaries and World Countries from VLIZ, builds and compresses the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads every compressed tile plus both metadata files and NOTICE, checks the count, publishes, verifies a query from an empty cache and deploys the identical files to Pages.
 
 Uploads are spaced eight seconds apart to stay below [GitHub's content-creation limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), so uploading a full global build takes about 80 minutes. Rate limits honor GitHub's retry delay, with bounded backoff. If a run stops with a draft, rerun the workflow: it checks every existing asset's hash and uploads only missing files. If those hashes differ, delete the draft and start again. Published releases cannot be resumed or replaced.
 
 The npm package must carry the `zones.json` and `tiles.json` from the release it points at; take them from the release rather than rebuilding.
 
-The package remains `private: true` and is not published to npm. Marine Regions asks that its products not be offered for download elsewhere; confirmation of derived-tile redistribution is pending with VLIZ. Releases are experimental and may be removed if VLIZ declines. The coastline comes from OpenStreetMap under ODbL 1.0; `land_v9` is not fetched or built.
+The package remains `private: true` and is not published to npm. VLIZ has approved the proposed derived-tile redistribution through GitHub releases and Pages. Maintainers monitor Marine Regions updates to avoid distributing deprecated versions. Coastlines come from World Countries under CC-BY 4.0; `land_v9` is not fetched or built.
 
 Enable GitHub Pages with GitHub Actions as its source before publishing. The mirror serves the latest release at `https://openwatersio.github.io/maritime-zones/v<version>/`, with the same filenames and SHA-256 as the release. Set `baseUrl` to that URL for whole-tile downloads. For browser range queries, host the demo on the same Pages origin and use FlatGeobuf with `seekableZstd: true`; Pages does not expose the `Content-Range` header to other origins. See [Tile format](docs/tile-format.md).
-
-To take down the experimental data, delete the release (`gh release delete v0.1.0 --yes --cleanup-tag`) and the Pages site (`gh api --method DELETE repos/openwatersio/maritime-zones/pages`). Keep the workflow in dry-run mode. Copies consumers have already downloaded remain in their caches.
 
 Publishing to npm would also need a JavaScript build, because Node does not strip TypeScript types inside `node_modules`.
 
