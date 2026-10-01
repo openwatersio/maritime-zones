@@ -55,6 +55,14 @@ test("builds OSM coastline lines into seekable tiles and ignores the land_v9 cac
     execFileSync(process.execPath, [join(work, "scripts/build.ts")]);
     const index = JSON.parse(readFileSync(join(work, "dist/tiles.json"), "utf8"));
     expect(Object.keys(index.tiles)).toEqual(["n0e0"]);
+    execFileSync("ogr2ogr", [
+      "-f",
+      "FlatGeobuf",
+      "-where",
+      "kind = 'boundary' AND zone IN (0)",
+      join(work, "boundaries.fgb"),
+      join(work, "dist/tiles/n0e0.fgb"),
+    ]);
     const bytes = readFileSync(join(work, "dist/tiles/n0e0.fgb.zst"));
     expect(index.tiles.n0e0).toEqual({ bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
     const raw = zstdDecompressSync(bytes);

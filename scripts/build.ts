@@ -222,7 +222,8 @@ for await (const line of createInterface({
   const { geometry } = JSON.parse(line);
   if (geometry?.type !== "LineString") throw new Error("OSM coastline must be a LineString");
   const points = simplify(geometry.coordinates.map(([x, y]: Point): Point => [round(x), round(y)]));
-  for (const part of chunk(points)) write({ kind: "land" }, "LineString", part);
+  // GDAL boundary filters need the zone field even in coastline-only tiles.
+  for (const part of chunk(points)) write({ kind: "land", zone: null }, "LineString", part);
 }
 flush();
 
