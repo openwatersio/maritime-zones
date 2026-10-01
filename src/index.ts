@@ -166,7 +166,7 @@ async function nearest(kind: "boundary" | "land", lat: number, lon: number, keep
   for (let r = 0.25; r <= MAX_RADIUS; r *= 2) {
     let best: Hit | null = null;
     for (const f of await query(kind, ...box({ lat, lon, radiusNm: r * 60 }))) {
-      const zone = f.zone === undefined ? null : zones()[f.zone]!;
+      const zone = kind === "land" ? null : zones()[f.zone!]!;
       if (!keep(zone)) continue;
       const [distanceNm, point] = closest(f.coordinates, lat, lon);
       if (!best || distanceNm < best.distanceNm)

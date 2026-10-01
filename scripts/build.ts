@@ -10,7 +10,7 @@
  *             not real boundaries.
  *   boundary  the real zone rings as LineStrings of at most CHUNK vertices,
  *             for distances.
- *   land      land_v9 coastline rings, chunked the same way.
+ *   land      OpenStreetMap coastline lines, chunked the same way.
  *
  * Features are not clipped at tile edges: each one goes into every tile its
  * bbox touches, so a query that reads the tiles under its search box sees
@@ -24,8 +24,9 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, createReadStream, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 import { TILE, tiles } from "../src/tiles.ts";
 import { DIST, LAYERS, TMP } from "./layers.ts";
 
@@ -204,18 +205,25 @@ const table: ReturnType<typeof properties>[] = [];
 
 for (const { key } of LAYERS) {
   for (const feature of features(key)) {
-    if (key !== "land") table.push(properties(key, feature.properties));
+    table.push(properties(key, feature.properties));
     const zone = table.length - 1;
     for (const rings of polygons(feature.geometry)) {
-      if (key === "land") {
-        for (const ring of rings) for (const line of chunk(ring)) write({ kind: "land" }, "LineString", line);
-        continue;
-      }
       for (const piece of subdivide(rings)) write({ kind: "zone", zone }, "Polygon", piece);
       for (const ring of rings) for (const line of chunk(ring)) write({ kind: "boundary", zone }, "LineString", line);
     }
   }
   console.log(`${key}: ${table.length} zones`);
+}
+for await (const line of createInterface({
+  input: createReadStream(join(TMP, "coastlines.geojsonl")),
+  crlfDelay: Infinity,
+})) {
+  if (!line) continue;
+  const { geometry } = JSON.parse(line);
+  if (geometry?.type !== "LineString") throw new Error("OSM coastline must be a LineString");
+  const points = simplify(geometry.coordinates.map(([x, y]: Point): Point => [round(x), round(y)]));
+  // GDAL boundary filters need an integer zone field even in coastline-only tiles.
+  for (const part of chunk(points)) write({ kind: "land", zone: -1 }, "LineString", part);
 }
 flush();
 
@@ -240,7 +248,8 @@ for (const file of readdirSync(join(TMP, "tiles")).sort()) {
     out,
     join(TMP, "tiles", file),
   ]);
-  const bytes = readFileSync(out);
+  execFileSync("t2sz", ["-r", "-s", "256K", "-l", "19", out]);
+  const bytes = readFileSync(`${out}.zst`);
   index[tile] = { bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
 }
 writeFileSync(join(DIST, "tiles.json"), JSON.stringify({ tile: TILE, tiles: index }, null, 1) + "\n");

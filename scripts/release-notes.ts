@@ -18,10 +18,14 @@ const mb = (bytes: number) => `${(bytes / 1e6).toFixed(0)} MB`;
 
 console.log(`Maritime zone tiles for @openwaters/maritime-zones ${version}. The package downloads the tiles it needs from this release and checks each against the sha256 in \`tiles.json\`.
 
-${sizes.length} tiles, ${mb(sizes.reduce((a, b) => a + b, 0))} in total. Built from the Marine Regions Maritime Boundaries Geodatabase (Flanders Marine Institute), CC-BY 4.0:
+${sizes.length} seekable zstd tiles (256 KiB frames, level 19), ${mb(sizes.reduce((a, b) => a + b, 0))} in total. Sizes and SHA-256 cover the compressed downloads.
+
+Zone and boundary features: Marine Regions Maritime Boundaries Geodatabase (Flanders Marine Institute), CC-BY 4.0. Coastline features: © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The source archive is recorded in upstream.lock.json. Marine Regions land_v9 is not used.
+
+This is an experimental release while VLIZ's confirmation of derived-tile redistribution is pending. The release and Pages mirror may be removed. The package remains private and is not published to npm.
 
 ${Object.values(lock)
   .map(({ title, features }) => `- ${title}: ${features} ${features === 1 ? "feature" : "features"}`)
   .join("\n")}
 
-**Not for navigation.** Marine Regions data "is not meant to be used for legal, economical … or navigational purposes" and "has no legal value whatsoever". See NOTICE for the citation of each layer.`);
+**Not for navigation.** Marine Regions data "is not meant to be used for legal, economical … or navigational purposes" and "has no legal value whatsoever". See the attached NOTICE for the citation and licence of each layer.`);

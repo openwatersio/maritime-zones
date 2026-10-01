@@ -8,6 +8,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
+import { zstdDecompressSync } from "node:zlib";
 
 const DATA = new URL("../dist/", import.meta.url);
 const VERSION: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
@@ -61,13 +62,7 @@ const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest(
 async function fromCache(tile: string): Promise<Uint8Array | undefined> {
   let bytes: Uint8Array;
   try {
-    // flatgeobuf's ArrayReader assumes it owns the whole ArrayBuffer from byte
-    // 0: it builds DataViews on bytes.buffer ignoring byteOffset, and reads index
-    // nodes with bytes.slice(...).buffer. Node Buffers break both (small reads
-    // are views into a shared pool; Buffer#slice is a view, not a copy), giving
-    // wrong features or a crash. A copy into a fresh Uint8Array satisfies both.
-    // https://github.com/flatgeobuf/flatgeobuf/issues/526
-    bytes = new Uint8Array(await readFile(join(config.cacheDir, `${tile}.fgb`)));
+    bytes = new Uint8Array(await readFile(join(config.cacheDir, `${tile}.fgb.zst`)));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;
@@ -77,7 +72,7 @@ async function fromCache(tile: string): Promise<Uint8Array | undefined> {
 }
 
 async function fromRelease(tile: string): Promise<Uint8Array> {
-  const url = `${config.baseUrl}/${tile}.fgb`;
+  const url = `${config.baseUrl}/${tile}.fgb.zst`;
   const failed = (reason: string) =>
     fail("DOWNLOAD_FAILED", tile, `Could not download tile ${tile} from ${url}: ${reason}`);
   let bytes: Uint8Array;
@@ -94,9 +89,12 @@ async function fromRelease(tile: string): Promise<Uint8Array> {
   }
   // Write then rename, so an interrupted download never leaves a partial tile.
   await mkdir(config.cacheDir, { recursive: true });
-  const partial = join(config.cacheDir, `${tile}.fgb.${process.pid}.${Math.random().toString(36).slice(2)}.partial`);
+  const partial = join(
+    config.cacheDir,
+    `${tile}.fgb.zst.${process.pid}.${Math.random().toString(36).slice(2)}.partial`,
+  );
   await writeFile(partial, bytes);
-  await rename(partial, join(config.cacheDir, `${tile}.fgb`));
+  await rename(partial, join(config.cacheDir, `${tile}.fgb.zst`));
   return bytes;
 }
 
@@ -120,7 +118,8 @@ function ensure(tile: string): Promise<Uint8Array> {
 /** A tile's bytes, kept in memory after the first read. */
 export async function load(tile: string): Promise<Uint8Array> {
   let bytes = memory.get(tile);
-  if (!bytes) memory.set(tile, (bytes = await ensure(tile)));
+  // FlatGeobuf needs an owned Uint8Array, not a Buffer view: https://github.com/flatgeobuf/flatgeobuf/issues/526
+  if (!bytes) memory.set(tile, (bytes = new Uint8Array(zstdDecompressSync(await ensure(tile)))));
   return bytes;
 }
 

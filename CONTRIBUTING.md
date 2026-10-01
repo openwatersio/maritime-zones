@@ -2,8 +2,8 @@
 
 ## Layout
 
-- `scripts/fetch.ts` downloads every layer from the VLIZ WFS into `tmp/`, one feature per request, and writes `upstream.lock.json`.
-- `scripts/build.ts` turns `tmp/` into `dist/zones.json`, `dist/tiles.json` and `dist/tiles/*.fgb`.
+- `scripts/fetch.ts` downloads every layer from the VLIZ WFS into `tmp/`, one feature per request, and writes `upstream.lock.json`. `scripts/fetch-land.ts` downloads the ODbL OpenStreetMap coastline archive, records its hash in the same lock and streams its lines through GDAL.
+- `scripts/build.ts` turns `tmp/` into `dist/zones.json`, `dist/tiles.json` and `dist/tiles/*.fgb.zst` (with raw `.fgb` intermediates for the GDAL distance oracle).
 - `scripts/layers.ts` lists the upstream layers and paths shared by the scripts.
 - `scripts/check.ts` compares answers at random points with the live WFS and with exact GDAL distances.
 - `scripts/bench.ts` prints answers at fixed points and times each query.
@@ -15,7 +15,7 @@
 
 ## Getting started
 
-Needs Node 24 (see `mise.toml`) and GDAL with FlatGeobuf support for `ogr2ogr`.
+Needs Node 24 (see `mise.toml`), GDAL with FlatGeobuf support for `ogr2ogr`, curl and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5. On macOS: `brew install gdal t2sz`.
 
 ```sh
 npm ci
@@ -40,17 +40,27 @@ CI does not run the vitest suite, because the tests need `dist/`, and building i
 
 ## Releases
 
-Tiles ship as flat assets on the GitHub release `v<version>`, where `<version>` is the one in `package.json`: every `dist/tiles/*.fgb` plus `dist/zones.json` and `dist/tiles.json`. The reader downloads tiles from the release matching its own version and checks them against the hashes in its packaged `tiles.json`, so a release is never replaced. New tiles need a new version.
+See [Tile format](docs/tile-format.md) for the seekable zstd format, compression measurements, range reads and what the download hashes cover.
+
+Tiles ship as flat assets on the GitHub release `v<version>`, where `<version>` is the one in `package.json`: every `dist/tiles/*.fgb.zst` plus `dist/zones.json`, `dist/tiles.json` and `NOTICE`. Raw `.fgb` intermediates stay local for the GDAL distance oracle. The reader downloads tiles from the release matching its own version and checks them against the hashes in its packaged `tiles.json`, so a release is never replaced. New tiles need a new version.
 
 To release:
 
-1. If Marine Regions has changed, run `npm run fetch` and commit the new `upstream.lock.json` in a pull request. The release workflow refuses to publish data that differs from the committed lock.
+1. If either source has changed, run `npm run fetch -- --fresh` and commit the new `upstream.lock.json` in a pull request. The release workflow refuses to publish data that differs from the committed lock.
 2. Bump `version` in `package.json` in a pull request.
-3. Run the **Release tiles** workflow from the Actions tab. It fetches every layer from VLIZ (about 30 minutes), builds the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads the 606 assets, checks the count and then publishes.
+3. Run the **Release tiles** workflow from the Actions tab. It fetches the maritime boundaries from VLIZ (about 30 minutes) and the OSM coastlines (about 925 MB), builds and compresses the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads every compressed tile plus both metadata files and NOTICE, checks the count, publishes, verifies a query from an empty cache and deploys the identical files to Pages.
+
+Uploads are spaced eight seconds apart to stay below [GitHub's content-creation limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), so uploading a full global build takes about 80 minutes. Rate limits honor GitHub's retry delay, with bounded backoff. If a run stops with a draft, rerun the workflow: it checks every existing asset's hash and uploads only missing files. If those hashes differ, delete the draft and start again. Published releases cannot be resumed or replaced.
 
 The npm package must carry the `zones.json` and `tiles.json` from the release it points at; take them from the release rather than rebuilding.
 
-Nothing is published yet. The package is `private`: Marine Regions asks that its products not be offered for download elsewhere, and we have asked VLIZ whether derived tiles are acceptable and whether the `land_v9` coastline is CC-BY. Run the workflow with `dry_run` off only after they answer. Publishing to npm also needs a JavaScript build, because Node does not strip TypeScript types inside `node_modules`.
+The package remains `private: true` and is not published to npm. Marine Regions asks that its products not be offered for download elsewhere; confirmation of derived-tile redistribution is pending with VLIZ. Releases are experimental and may be removed if VLIZ declines. The coastline comes from OpenStreetMap under ODbL 1.0; `land_v9` is not fetched or built.
+
+Enable GitHub Pages with GitHub Actions as its source before publishing. The mirror serves the latest release at `https://openwatersio.github.io/maritime-zones/v<version>/`, with the same filenames and SHA-256 as the release. Set `baseUrl` to that URL for whole-tile downloads. For browser range queries, host the demo on the same Pages origin and use FlatGeobuf with `seekableZstd: true`; Pages does not expose the `Content-Range` header to other origins. See [Tile format](docs/tile-format.md).
+
+To take down the experimental data, delete the release (`gh release delete v0.1.0 --yes --cleanup-tag`) and the Pages site (`gh api --method DELETE repos/openwatersio/maritime-zones/pages`). Keep the workflow in dry-run mode. Copies consumers have already downloaded remain in their caches.
+
+Publishing to npm would also need a JavaScript build, because Node does not strip TypeScript types inside `node_modules`.
 
 ## Gotchas
 
