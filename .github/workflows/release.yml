@@ -111,19 +111,7 @@ jobs:
         run: |
           mkdir -p "public/$TAG"
           cp dist/tiles/*.fgb.zst dist/tiles.json dist/zones.json NOTICE "public/$TAG/"
-          cat > public/index.html <<EOF
-          <!doctype html>
-          <html lang="en">
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>Maritime zone tiles</title>
-          <h1>Maritime zone tiles</h1>
-          <p>Experimental data. Redistribution confirmation from VLIZ is pending; this mirror may be removed.</p>
-          <p><strong>Not for navigation.</strong></p>
-          <p><a href="$TAG/tiles.json">$TAG tile index</a> · <a href="$TAG/zones.json">Zone metadata</a> · <a href="$TAG/NOTICE">Attribution and licences</a></p>
-          <p>Maritime boundaries © Flanders Marine Institute (CC-BY 4.0). Coastlines © OpenStreetMap contributors (ODbL 1.0).</p>
-          </html>
-          EOF
+          TILE_VERSION="$TAG" npm run demo:build
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: ${{ !inputs.dry_run }}
         with:
@@ -132,6 +120,9 @@ jobs:
   pages:
     if: ${{ !inputs.dry_run }}
     needs: release
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       pages: write

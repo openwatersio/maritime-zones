@@ -28,13 +28,18 @@
     "build": "node scripts/build.ts",
     "test": "vitest run && tsc --noEmit",
     "lint": "prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "demo:build": "node scripts/build-demo.ts",
+    "demo:dev": "node scripts/build-demo.ts --serve"
   },
   "dependencies": {
     "flatgeobuf": "^4.5.0"
   },
   "devDependencies": {
+    "@types/leaflet": "1.9.21",
     "@types/node": "^26.6.3",
+    "esbuild": "0.28.2",
+    "leaflet": "1.9.4",
     "prettier": "^3.9.9",
     "typescript": "^7.0.2",
     "vitest": "^5.0.2"

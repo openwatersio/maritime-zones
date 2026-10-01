@@ -19,3 +19,5 @@ jobs:
       # The vitest suite needs dist/, which means downloading every layer from
       # VLIZ; it runs locally. See CONTRIBUTING.md.
       - run: npx tsc -p .
+      - run: npx vitest run test/regulations.test.ts
+      - run: npm run demo:build

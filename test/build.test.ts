@@ -11,7 +11,14 @@ import { expect, test } from "vitest";
 test("builds OSM coastline lines into seekable tiles and ignores the land_v9 cache", async () => {
   const work = mkdtempSync(join(tmpdir(), "maritime-zones-build-"));
   try {
-    for (const file of ["scripts/build.ts", "scripts/layers.ts", "src/tiles.ts", "src/index.ts", "src/store.ts"]) {
+    for (const file of [
+      "scripts/build.ts",
+      "scripts/layers.ts",
+      "src/tiles.ts",
+      "src/index.ts",
+      "src/queries.ts",
+      "src/store.ts",
+    ]) {
       mkdirSync(dirname(join(work, file)), { recursive: true });
       copyFileSync(new URL(`../${file}`, import.meta.url), join(work, file));
     }
