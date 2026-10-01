@@ -80,6 +80,8 @@ Queries never answer from partial data. A tile they can't get throws an error th
 
 Each tile holds zone polygons subdivided into pieces of at most 256 vertices for point lookups, zone rings as lines for distances, and OSM coastline lines. Features are not clipped at tile edges; each one is written to every tile its bounding box touches. `zones.json` holds each zone's attributes once, and tile features refer to it by index. The 586 tiles total 282 MB compressed; the median tile is 0.06 MB and the largest is 10.2 MB. The release's `tiles.json` records each compressed download size and SHA-256; [Tile format](docs/tile-format.md) documents the compression measurements.
 
+Coastline features use `zone: -1` so every tile has the same integer field for GDAL filters. That value has no entry in `zones.json`; `distanceToLand()` returns `zone: null`.
+
 ## Building
 
 Needs Node 24, GDAL (`ogr2ogr`) with FlatGeobuf support, curl and [t2sz](https://github.com/martinellimarco/t2sz) 1.2.5 (`brew install gdal t2sz` on macOS).
