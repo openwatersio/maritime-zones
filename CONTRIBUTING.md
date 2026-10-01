@@ -40,6 +40,8 @@ CI does not run the vitest suite, because the tests need `dist/`, and building i
 
 ## Releases
 
+See [Tile format](docs/tile-format.md) for the seekable zstd format, compression measurements, range reads and what the download hashes cover.
+
 Tiles ship as flat assets on the GitHub release `v<version>`, where `<version>` is the one in `package.json`: every `dist/tiles/*.fgb` plus `dist/zones.json` and `dist/tiles.json`. The reader downloads tiles from the release matching its own version and checks them against the hashes in its packaged `tiles.json`, so a release is never replaced. New tiles need a new version.
 
 To release:
