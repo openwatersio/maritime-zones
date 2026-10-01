@@ -9,10 +9,11 @@
 - `benchmarks/` times the queries offline and over HTTP range reads, working tree against a git revision. See Performance below.
 - `scripts/release-notes.ts` prints the release notes for the current build.
 - `scripts/update-notes.ts` prints the monthly check's WFS load and source changes.
+- `scripts/package-metadata.ts` downloads the package version's released metadata before packing. `scripts/build-package.ts` bundles the Node reader into `lib/index.js`; `tsconfig.package.json` emits its declarations. `scripts/check-package.ts` installs a tarball and checks the offline public API and consumer types.
 - `src/` is the reader: `index.ts` has the queries, `store.ts` finds tiles in memory, the cache or the GitHub release and checks them, and `tiles.ts` maps areas to tile names.
 - `test/` holds vitest cases. `queries.test.ts` checks answers at fixed points. `store.test.ts` checks downloading and caching against a local server that serves `dist/tiles` the way a release serves assets. Both read `dist/`.
 
-`tmp/` and `dist/` are not committed.
+`tmp/`, `dist/` and `lib/` are not committed.
 
 ## Getting started
 
@@ -35,11 +36,15 @@ CI runs:
 npm ci
 npm run lint
 npx tsc -p .
-npx vitest run test/regulations.test.ts
+npx vitest run test/regulations.test.ts test/package.test.ts
 npm run demo:build
+gh release download -p tiles.json -p zones.json -D dist
+npm run package:build
+npm pack --dry-run --ignore-scripts
+npm run package:check
 ```
 
-CI does not run the vitest suite, because the tests need `dist/`, and building it downloads every layer from VLIZ. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
+CI does not run the full vitest suite, because the query tests need built tiles, and building them downloads every layer from VLIZ. The packaging smoke test uses the newest released metadata as a fixture and skips prepack, so CI can run before the package version's tile release exists. Its installed consumer calls `tilesFor()` without network access, and TypeScript checks the shipped declarations. Publishing always runs prepack against the exact version's release. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
 
 A separate CI job benchmarks the queries when `src/`, `benchmarks/`, the dependencies or the workflow change. It uses the released tiles, so it needs no build.
 
@@ -112,7 +117,7 @@ The reply approves the proposed derived-tile redistribution and monthly load. VL
 
 The source confirmation names `worldcountries_esri_2014`, not `land_v9`. World Countries is a proxy for normal baselines. Country rings include inland borders and holes, and the build does not model straight or archipelagic legal baselines, low-water observations or discharge rules. Redistribution permission does not change the navigation or legal-use limitations.
 
-The World Countries build is version `0.2.0`. Publish it as a new tiles release after reviewing `upstream.lock.json`, rebuilding, running `npm test` and `node scripts/check.ts`, and checking the new tile counts, sizes and hashes. Require 0 zone mismatches and distance errors under 1%. Verify the fresh-cache Belgian query and Pages range reads against that release's metadata. Keep `v0.1.0` and its OSM assets unchanged: changing coastlines changes hashes, and caches are separated by version. Releases containing OSM data retain their own attribution and ODbL terms. The package stays `private: true`; npm publication needs a separate decision.
+The World Countries build is version `0.2.0`. Publish it as a new tiles release after reviewing `upstream.lock.json`, rebuilding, running `npm test` and `node scripts/check.ts`, and checking the new tile counts, sizes and hashes. Require 0 zone mismatches and distance errors under 1%. Verify the fresh-cache Belgian query and Pages range reads against that release's metadata. Keep `v0.1.0` and its OSM assets unchanged: changing coastlines changes hashes, and caches are separated by version. Releases containing OSM data retain their own attribution and ODbL terms. npm publication is authorized and follows the matching tile release.
 
 ## Releases
 
@@ -120,21 +125,37 @@ See [Tile format](docs/tile-format.md) for the seekable zstd format, compression
 
 Tiles ship as flat assets on the GitHub release `v<version>`, where `<version>` is the one in `package.json`: every `dist/tiles/*.fgb.zst` plus `dist/zones.json`, `dist/tiles.json` and `NOTICE`. Raw `.fgb` intermediates stay local for the GDAL distance oracle. The reader downloads tiles from the release matching its own version and checks them against the hashes in its packaged `tiles.json`, so a release is never replaced. New tiles need a new version.
 
-To release:
+To release tiles:
 
-1. If either source has changed, run `npm run fetch -- --fresh` and commit the new `upstream.lock.json` in a pull request. The release workflow refuses to publish data that differs from the committed lock.
+1. Review unfinished specs and plans, preserve lasting guidance in maintained docs, and remove completed plans. Have a human review documentation changes in the release PR. If either source has changed, run `npm run fetch -- --fresh` and commit the new `upstream.lock.json` in a pull request. The release workflow refuses to publish data that differs from the committed lock.
 2. Bump `version` in `package.json` in a pull request.
 3. Run the **Release tiles** workflow from the Actions tab. It fetches the maritime boundaries and World Countries from VLIZ, builds and compresses the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads every compressed tile plus both metadata files and NOTICE, checks the count, publishes, verifies a query from an empty cache and deploys the identical files to Pages.
 
 Uploads are spaced eight seconds apart to stay below [GitHub's content-creation limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), so uploading a full global build takes about 80 minutes. Rate limits honor GitHub's retry delay, with bounded backoff. If a run stops with a draft, rerun the workflow: it checks every existing asset's hash and uploads only missing files. If those hashes differ, delete the draft and start again. Published releases cannot be resumed or replaced.
 
-The npm package must carry the `zones.json` and `tiles.json` from the release it points at; take them from the release rather than rebuilding.
+The npm package carries `zones.json` and `tiles.json` from the release it points at. `prepack` downloads those exact files, then builds JavaScript and declarations in `lib/`. It refuses to pack without the matching release, even if locally built metadata exists. Tiles stay out of the tarball. `lib/flatgeobuf.LICENSE` covers the bundled FlatGeobuf reader; its dependencies stay external. FlatGeobuf 4.5.0 is bundled with console calls dropped because its deep entry logs every index node. Once a release includes [flatgeobuf#533](https://github.com/flatgeobuf/flatgeobuf/pull/533), use its public `flatgeobuf/geojson` entry and remove this fallback.
 
-The package remains `private: true` and is not published to npm. VLIZ has approved the proposed derived-tile redistribution through GitHub releases and Pages. Maintainers monitor Marine Regions updates to avoid distributing deprecated versions. Coastlines come from World Countries under CC-BY 4.0; `land_v9` is not fetched or built.
+VLIZ has approved the proposed derived-tile redistribution through GitHub releases and Pages. Maintainers monitor Marine Regions updates to avoid distributing deprecated versions. Coastlines come from World Countries under CC-BY 4.0; `land_v9` is not fetched or built.
+
+### npm publication
+
+The first public package is `@openwaters/maritime-zones@0.2.0`. Publish the `v0.2.0` tiles first, then run these checks from the reviewed package commit:
+
+```sh
+npm ci
+npm run lint
+npx tsc -p .
+npx vitest run test/regulations.test.ts test/package.test.ts
+npm pack --dry-run
+npm run package:check
+npm publish
+```
+
+The first publish needs a maintainer's npm login and two-factor authentication. Register npm's GitHub Actions trusted publisher after the package exists: owner `openwatersio`, repository `maritime-zones`, workflow `publish.yml`, no environment. No npm token is stored in GitHub. The tile tag is required before this manual npm publish; do not recreate it or republish the immutable tiles afterward.
+
+For later versions, publish the matching tiles, then dispatch **Publish npm package** on `main`. It verifies packaging and publishes with OIDC and provenance. A release published by a human also triggers it at the release tag; releases created with the tile workflow's `GITHUB_TOKEN` do not trigger another workflow, so they require the explicit dispatch. Never dispatch the npm workflow for the hand-published first version. Verify the workflow result and `npm view @openwaters/maritime-zones version` before reporting a publication complete.
 
 Enable GitHub Pages with GitHub Actions as its source before publishing. The mirror serves the latest release at `https://openwatersio.github.io/maritime-zones/v<version>/`, with the same filenames and SHA-256 as the release. Set `baseUrl` to that URL for whole-tile downloads. For browser range queries, host the demo on the same Pages origin and use FlatGeobuf with `seekableZstd: true`; Pages does not expose the `Content-Range` header to other origins. See [Tile format](docs/tile-format.md).
-
-Publishing to npm would also need a JavaScript build, because Node does not strip TypeScript types inside `node_modules`.
 
 ## Gotchas
 

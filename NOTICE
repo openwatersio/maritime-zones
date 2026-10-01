@@ -1,6 +1,6 @@
 @openwaters/maritime-zones
 
-The code in this package is MIT licensed (see LICENSE). The zone and boundary features in dist/ are derived from the Marine Regions Maritime Boundaries Geodatabase. Land features are derived from the World Countries Geodatabase. Both datasets are published by the Flanders Marine Institute (VLIZ) under the Creative Commons Attribution 4.0 International licence (https://creativecommons.org/licenses/by/4.0/).
+This project's code is MIT licensed (see LICENSE). The npm reader bundles FlatGeobuf under its BSD licence (see lib/flatgeobuf.LICENSE). The zone and boundary features in dist/ are derived from the Marine Regions Maritime Boundaries Geodatabase. Land features are derived from the World Countries Geodatabase. Both datasets are published by the Flanders Marine Institute (VLIZ) under the Creative Commons Attribution 4.0 International licence (https://creativecommons.org/licenses/by/4.0/).
 
 Changes: polygons are rounded to 1e-5 degrees and subdivided into small pieces; zone rings are split into short lines; attributes are renamed and reduced. Features are stored together in 10° FlatGeobuf tiles compressed as seekable zstd.
 
