@@ -148,7 +148,7 @@ export function createQueries(
 
   /** Nearest line in a file, searching outward until the box holds the answer. */
   async function nearest(kind: "boundary" | "land", lat: number, lon: number, keep: (zone: Zone | null) => boolean) {
-    for (let r = 0.25; r <= MAX_RADIUS; r *= 2) {
+    for (let r = 0.25; ;) {
       let best: Hit | null = null;
       for (const f of await query(kind, ...box({ lat, lon, radiusNm: r * 60 }))) {
         const zone = kind === "land" ? null : zones()[f.zone!]!;
@@ -159,8 +159,11 @@ export function createQueries(
       }
       // Anything within r degrees of latitude (r × 60 NM) is inside this box, so a hit that close is final.
       if (best && best.distanceNm <= r * 60) return best;
+      if (r >= MAX_RADIUS) return null;
+      // A hit at d NM beyond the box bounds the answer: the next box only needs to reach d, not 2r.
+      // The margin keeps the same hit inside its own box despite rounding.
+      r = Math.min(MAX_RADIUS, best ? best.distanceNm / 60 + 1e-6 : r * 2);
     }
-    return null;
   }
 
   /** Nearest point of another territory's waters (default: sovereign waters). */

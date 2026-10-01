@@ -43,6 +43,16 @@ describe("nearestTerritory", () => {
     expect(hit?.bearingDeg).toBeGreaterThan(80);
     expect(hit?.bearingDeg).toBeLessThan(100);
   });
+
+  test("Labrador Sea: Greenland's 12 NM ring crosses the first search box but its nearest point is 345 NM away", async () => {
+    // The first hit bounds the search; the answer must still be the nearest point of any ring, not the first ring found.
+    const hit = await nearestTerritory(60.6, -62.7);
+    expect(hit?.zone?.iso_ter).toBe("GRL");
+    expect(hit?.distanceNm).toBeGreaterThan(335);
+    expect(hit?.distanceNm).toBeLessThan(355);
+    expect(hit?.bearingDeg).toBeGreaterThan(40);
+    expect(hit?.bearingDeg).toBeLessThan(60);
+  });
 });
 
 describe("distanceTo", () => {
