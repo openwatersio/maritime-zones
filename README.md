@@ -10,6 +10,12 @@ The tiles release is experimental while VLIZ confirms whether derived maritime-b
 
 The [coastline source and VLIZ reply guide](CONTRIBUTING.md#coastline-source-and-vliz-reply) explains the v9 workaround, the confirmations needed to restore v9 and the release steps for switching sources.
 
+## Map demos
+
+Try the [interactive demos](https://openwatersio.github.io/maritime-zones/): move the marker, choose a sample position or enter coordinates to answer all four questions. Each view includes Browser and Node.js code examples and its raw result. The browser reads byte ranges from the published tiles on the same Pages origin.
+
+The main black-water example combines `whereAmI()` and `distanceToLand()` with a caller-supplied Canadian 3 NM distance rule in `demo/regulations.ts`, outside the package API. It checks only this illustrative threshold against the OSM coastline. Passing it does not authorize discharge: vessel requirements, local restrictions and the regulation's legal definition of shore still need checking. See [Canada's section 96](https://laws-lois.justice.gc.ca/eng/regulations/SOR-2012-69/section-96.html). Other countries and ambiguous territory contexts return unresolved.
+
 ## Usage
 
 Use the release's source and metadata directly while the package is private:

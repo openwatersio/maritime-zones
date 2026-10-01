@@ -35,9 +35,29 @@ CI runs:
 npm ci
 npm run lint
 npx tsc -p .
+npx vitest run test/regulations.test.ts
+npm run demo:build
 ```
 
 CI does not run the vitest suite, because the tests need `dist/`, and building it downloads every layer from VLIZ. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
+
+## Pages demos
+
+`demo/` contains the five map views, Browser and Node.js snippets, and the separate Canadian 3 NM example rule. `src/queries.ts` supplies the same geometry logic to the Node reader and browser range reader; regulations stay in the demo. Missing country rules, overlapping territory contexts and unknown distances do not produce a discharge decision. The example measures the OSM coastline, not a legal baseline, and does not model the remaining conditions in section 96.
+
+To preview using the existing published tiles without fetching upstream data:
+
+```sh
+npm ci
+npm run demo:build
+mkdir -p public/v0.1.0
+gh release download v0.1.0 --dir public/v0.1.0
+npm run demo:dev
+```
+
+Open `http://127.0.0.1:4173/`. The local server supports the suffix byte ranges the seekable reader requires. To preview a different release, download its assets into `public/<tag>/` and set `TILE_VERSION=<tag>` when building or starting the preview. For Node snippets, also download that release's `tiles.json` and `zones.json` into `dist/`.
+
+The **Deploy demos** workflow rebuilds Pages on relevant pushes to main, or on manual dispatch. It downloads the latest existing tile release and builds only the demo: no WFS requests, source rebuild, release replacement or npm publication. The release workflow also builds the demo when publishing new tiles. Both deployments preserve the experimental notice and source attribution. If VLIZ declines redistribution, disable the demo workflow along with taking down the mirror below; a subsequent push or manual run must not restore it.
 
 ## Monthly upstream check
 

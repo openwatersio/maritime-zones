@@ -1,4 +1,5 @@
 tmp/
 dist/
+public/
 node_modules/
 *.log

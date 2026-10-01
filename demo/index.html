@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Explore maritime zones, nearby territory and coastline distances on a map, with working JavaScript examples."
+    />
+    <title>Maritime zones · Open Waters</title>
+    <link rel="stylesheet" href="./main.css" />
+    <script type="module" src="./main.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#results">Skip to query results</a>
+    <header>
+      <a class="brand" href="https://openwaters.io"
+        ><svg aria-hidden="true" width="30" height="26" viewBox="0 0 30 26">
+          <path
+            d="M2 7q6-6 13 0t13 0M2 15q6-6 13 0t13 0M2 23q6-6 13 0t13 0"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          /></svg
+        >Open Waters</a
+      >
+      <nav aria-label="Project">
+        <a href="https://github.com/openwatersio/maritime-zones">Source on GitHub</a><a href="#code">Code examples</a>
+      </nav>
+    </header>
+    <main>
+      <div class="intro">
+        <h1>Know the waters around you.</h1>
+        <p>
+          One position. Four maritime questions. Try them separately, or combine them in a black-water discharge check.
+        </p>
+      </div>
+      <p class="notice">
+        <strong>Experimental. Not for navigation or discharge clearance.</strong> VLIZ redistribution confirmation is
+        pending; this demo and its tiles may be removed.
+      </p>
+      <nav class="queries" aria-label="Choose a demo">
+        <button data-query="blackwater" aria-pressed="true">Black-water check</button>
+        <button data-query="zones" aria-pressed="false">Which zones?</button>
+        <button data-query="nearest" aria-pressed="false">Next territory</button>
+        <button data-query="territory" aria-pressed="false">Territory X</button>
+        <button data-query="land" aria-pressed="false">Distance to land</button>
+      </nav>
+      <div class="workspace">
+        <section class="map-pane" aria-label="Choose a position">
+          <div class="presets" aria-label="Example positions">
+            <button data-preset="canada">Strait of Georgia</button><button data-preset="shore">Near shore</button
+            ><button data-preset="haro">Haro Strait</button><button data-preset="channel">English Channel</button
+            ><button data-preset="ostend">Off Ostend</button><button data-preset="atlantic">Open Atlantic</button
+            ><button data-preset="fiji">Fiji</button>
+          </div>
+          <div
+            id="map"
+            aria-label="Interactive map. Click to choose a position, or use the coordinate inputs below."
+          ></div>
+          <p class="map-hint">
+            Click the map or drag the position marker. Shaded pieces show nearby parts of the selected zone; lines show
+            the nearest point.
+          </p>
+          <form id="position">
+            <label
+              >Latitude<input
+                id="latitude"
+                name="latitude"
+                type="number"
+                min="-85"
+                max="85"
+                step="any"
+                value="49.15"
+                required
+            /></label>
+            <label
+              >Longitude<input
+                id="longitude"
+                name="longitude"
+                type="number"
+                min="-180"
+                max="180"
+                step="any"
+                value="-123.4"
+                required
+            /></label>
+            <button type="submit" id="check" disabled>Check position</button>
+            <button type="button" id="locate">Use my position</button>
+          </form>
+        </section>
+        <section class="answers" id="results" aria-label="Query results" aria-busy="true">
+          <h2 id="question">Can I open my black-water tank here?</h2>
+          <p id="status" role="status" aria-live="polite">Loading the published data…</p>
+          <div id="result"></div>
+          <button id="retry" type="button" hidden>Retry query</button>
+          <div class="code" id="code">
+            <div class="code-heading">
+              <h3>Try the same query</h3>
+              <button id="copy" type="button">Copy code</button>
+            </div>
+            <label class="runtime"
+              >Runtime<select id="runtime">
+                <option value="browser">Browser</option>
+                <option value="node">Node.js</option>
+              </select></label
+            >
+            <pre><code id="snippet">// Loading…</code></pre>
+            <p id="code-note"></p>
+          </div>
+          <details>
+            <summary>Raw result</summary>
+            <pre id="raw">No result yet.</pre>
+          </details>
+        </section>
+      </div>
+      <section class="about">
+        <h2>From a position to a decision</h2>
+        <p>
+          The library answers geometry questions. The black-water example combines territory context with coastline
+          distance, then calls a separate regulations lookup. It does not turn a distance into permission: vessel
+          details, local restrictions and legally defined baselines belong in the caller’s rules service.
+        </p>
+        <p>
+          Maritime boundaries: <a href="https://www.marineregions.org/">Flanders Marine Institute / Marine Regions</a>,
+          CC-BY 4.0. Coastlines: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, ODbL
+          1.0. Marine Regions land_v9 is not used.
+        </p>
+      </section>
+    </main>
+    <footer>
+      <span id="version">Published tile data</span
+      ><a id="notice-link" href="./v0.1.0/NOTICE">Attribution and licences</a
+      ><a href="https://github.com/openwatersio/maritime-zones/blob/main/CONTRIBUTING.md">Build and source guide</a
+      ><span>Private package. No npm publication.</span>
+    </footer>
+    <noscript
+      ><p class="notice">
+        Enable JavaScript for the interactive queries. The
+        <a href="https://github.com/openwatersio/maritime-zones">source and Node.js examples</a> are available on
+        GitHub.
+      </p></noscript
+    >
+  </body>
+</html>
