@@ -6,9 +6,9 @@ Offline answers to four questions about a position at sea: which maritime zones 
 
 ## Status
 
-VLIZ has approved redistribution of the derived tiles and the monthly upstream-check load. Maintainers monitor source updates to avoid distributing deprecated versions. Coastlines use the updated World Countries Geodatabase served as `MarineRegions:worldcountries_esri_2014`, the normal-baseline source identified by Marine Regions, under CC-BY 4.0. npm publication is authorized; the first publish requires the matching `v0.2.0` tile release. See NOTICE for attribution and licences.
+VLIZ has approved redistribution of the derived tiles and the monthly upstream-check load. Maintainers monitor source updates to avoid distributing deprecated versions. Coastlines use the updated World Countries Geodatabase served as `MarineRegions:worldcountries_esri_2014`, the normal-baseline source identified by Marine Regions, under CC-BY 4.0. The reader is published to npm as `@openwaters/maritime-zones`. See NOTICE for attribution and licences.
 
-The [coastline source and VLIZ reply guide](CONTRIBUTING.md#coastline-source-and-vliz-reply) records the permission scope, source citation and release procedure. The published `v0.1.0` tiles use OpenStreetMap coastlines under ODbL 1.0; the World Countries build is version `0.2.0` and requires a new tiles release.
+The [coastline source and VLIZ reply guide](CONTRIBUTING.md#coastline-source-and-vliz-reply) records the permission scope, source citation and release procedure. Releases from `v0.2.0` use World Countries coastlines; `v0.1.0` uses OpenStreetMap coastlines under ODbL 1.0.
 
 ## Map demos
 
@@ -18,7 +18,7 @@ The main black-water example combines `whereAmI()` and `distanceToLand()` with a
 
 ## Usage
 
-Needs Node 24 or newer. After the first npm publication:
+Needs Node 24 or newer.
 
 ```sh
 npm install @openwaters/maritime-zones
