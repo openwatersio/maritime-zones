@@ -75,6 +75,8 @@ CI compares a pull request with its base, or a push to `main` with the previous 
 
 A pull request intended to improve the performance of a benchmarked function must also update the README's Performance section with its candidate numbers and CI run link. Keep the README table to current measurements; put the before-and-after comparison in the pull request body.
 
+Performance improvements to the published reader also need an [npm release](#reader-changes-and-npm-releases). Include the version bump in the PR or link a follow-up release PR.
+
 ## Pages demos
 
 `demo/` contains the five map views, Browser and Node.js snippets, and the separate Canadian 3 NM example rule. `src/queries.ts` supplies the same geometry logic to the Node reader and browser range reader; regulations stay in the demo. Missing country rules, overlapping territory contexts and unknown distances do not produce a discharge decision. The example measures the coastline in the selected release and does not model legal baselines or the remaining conditions in section 96. Its attribution follows the selected release: OpenStreetMap for `v0.1.0`, World Countries for the `v0.2.0` build.
@@ -138,6 +140,14 @@ Uploads are spaced eight seconds apart to stay below [GitHub's content-creation 
 The npm package carries `zones.json` and `tiles.json` from the release it points at. `prepack` downloads those exact files, then builds JavaScript and declarations in `lib/`. It refuses to pack without the matching release, even if locally built metadata exists. Tiles stay out of the tarball. `lib/flatgeobuf.LICENSE` covers the bundled FlatGeobuf reader; its dependencies stay external. The reader uses FlatGeobuf's array and HTTP readers to filter feature kinds before decoding geometry. FlatGeobuf 4.5.0 is bundled with console calls dropped because its deep entry logs every index node. Once a release includes [flatgeobuf#533](https://github.com/flatgeobuf/flatgeobuf/pull/533), remove the console suppression.
 
 VLIZ has approved the proposed derived-tile redistribution through GitHub releases and Pages. Maintainers monitor Marine Regions updates to avoid distributing deprecated versions. Coastlines come from World Countries under CC-BY 4.0; `land_v9` is not fetched or built.
+
+### Reader changes and npm releases
+
+Reader fixes and performance improvements must ship in a new npm version for package consumers to receive them. Merging to `main` or deploying the Pages demo does not update an already published package. Use a patch release for a compatible fix or optimization, and update both `package.json` and `package-lock.json` (for example, `npm version patch --no-git-tag-version`). The change PR must include the bump or link a follow-up release PR; that release must include the merged reader changes.
+
+The npm and tile versions are coupled: `scripts/package-metadata.ts` downloads metadata from `v<package version>`, and `src/store.ts` uses that same release for tile downloads and the cache. Even when a reader change leaves the data unchanged, publish the matching tile release through the release procedure above before running **Publish npm package**. A version bump alone cannot reuse an older tile release, and published npm versions and tile assets must not be overwritten.
+
+After publishing, verify the workflow succeeded and `npm view @openwaters/maritime-zones version` reports the intended version. Record that version in the release PR so consumers know which version to install or upgrade to. Documentation-only changes do not need an npm release.
 
 ### npm publication
 
