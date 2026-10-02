@@ -4,7 +4,7 @@
  * interleave. Usage: node benchmarks/measure.ts <source-root> offline|range <workload> [iterations]
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { digest } from "./digest.ts";
@@ -35,7 +35,11 @@ if (mode === "offline") {
 } else {
   // The browser path: the shared query math over HTTP range reads of the compressed tiles.
   const { createQueries } = await load("src/queries.ts");
-  const { deserialize } = await import("flatgeobuf/lib/mjs/geojson.js");
+  const { HttpReader } = await import("flatgeobuf/lib/mjs/http-reader.js");
+  const { SeekableZstdReader } = await import("flatgeobuf/lib/mjs/seekable-zstd.js");
+  const { fromFeature } = existsSync(join(source, "src/feature.ts"))
+    ? await load("src/feature.ts")
+    : await import("flatgeobuf/lib/mjs/geojson/feature.js");
   const index = JSON.parse(readFileSync(join(source, "dist/tiles.json"), "utf8")).tiles;
   const zones = JSON.parse(readFileSync(join(source, "dist/zones.json"), "utf8"));
   server = await serveRanges(cacheDir);
@@ -48,7 +52,14 @@ if (mode === "offline") {
     return response;
   };
   api = createQueries(
-    (tile: string, rect: unknown) => deserialize(`${base}${tile}.fgb.zst`, { rect, seekableZstd: true } as any),
+    async function* (tile: string, rect: any, kind?: string) {
+      const source = await SeekableZstdReader.open(`${base}${tile}.fgb.zst`);
+      const reader = await HttpReader.openSource(source);
+      for await (const { id, feature } of reader.selectBbox(rect)) {
+        const decoded = fromFeature(id, feature, reader.header, kind);
+        if (decoded) yield decoded;
+      }
+    },
     () => index,
     () => zones,
   );

@@ -1,4 +1,4 @@
-import { fromFeature } from "flatgeobuf/lib/mjs/geojson/feature.js";
+import { fromFeature } from "../src/feature.ts";
 import { HttpReader } from "flatgeobuf/lib/mjs/http-reader.js";
 import { SeekableZstdReader } from "flatgeobuf/lib/mjs/seekable-zstd.js";
 import { createQueries, type Rect, type Zone } from "../src/queries.ts";
@@ -42,11 +42,14 @@ function wasmUrl() {
     });
   return wasm;
 }
-async function* read(tile: string, rect: Rect) {
+async function* read(tile: string, rect: Rect, kind?: string) {
   const codecUrl = await wasmUrl();
   const source = await SeekableZstdReader.open(new URL(`${tile}.fgb.zst`, base).href, false, {}, codecUrl);
   const reader = await HttpReader.openSource(source);
-  for await (const { id, feature } of reader.selectBbox(rect)) yield fromFeature(id, feature, reader.header);
+  for await (const { id, feature } of reader.selectBbox(rect)) {
+    const decoded = fromFeature(id, feature, reader.header, kind);
+    if (decoded) yield decoded;
+  }
 }
 async function reader() {
   const data = await metadata();

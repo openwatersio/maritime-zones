@@ -16,6 +16,7 @@ test("builds World Countries rings into seekable land tiles, outside the zone ta
       "scripts/layers.ts",
       "src/tiles.ts",
       "src/index.ts",
+      "src/feature.ts",
       "src/queries.ts",
       "src/store.ts",
     ]) {

@@ -37,7 +37,7 @@ export type Rect = { minX: number; minY: number; maxX: number; maxY: number };
 
 /** The same query math for offline files and browser range reads. */
 export function createQueries(
-  read: (tile: string, rect: Rect) => AsyncIterable<unknown>,
+  read: (tile: string, rect: Rect, kind: string) => AsyncIterable<unknown>,
   listed: () => Record<string, unknown>,
   zones: () => Zone[],
 ) {
@@ -65,12 +65,13 @@ export function createQueries(
       const rect = { minX: box[0], minY: box[1], maxX: box[2], maxY: box[3] };
       for (const tile of tiles(box)) {
         if (!listed()[tile]) continue;
-        for await (const f of read(tile, rect)) {
-          const { properties, geometry } = f as unknown as {
+        for await (const f of read(tile, rect, kind)) {
+          const feature = f as unknown as {
             properties: { kind: Kind; zone?: number };
             geometry: { coordinates: any };
           };
-          if (properties.kind === kind) found.push({ zone: properties.zone, coordinates: geometry.coordinates });
+          if (feature.properties.kind === kind)
+            found.push({ zone: feature.properties.zone, coordinates: feature.geometry.coordinates });
         }
       }
     }
