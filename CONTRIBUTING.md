@@ -73,6 +73,8 @@ node benchmarks/compare.ts base.json candidate.json 20
 
 CI compares a pull request with its base, or a push to `main` with the previous commit, publishes the table in the Actions summary and keeps the reports as an artifact for 30 days. The tile cache is kept between runs, keyed on the package version and the workloads.
 
+A pull request intended to improve the performance of a benchmarked function must also update the README's Performance section with its candidate numbers and CI run link. Keep the README table to current measurements; put the before-and-after comparison in the pull request body.
+
 ## Pages demos
 
 `demo/` contains the five map views, Browser and Node.js snippets, and the separate Canadian 3 NM example rule. `src/queries.ts` supplies the same geometry logic to the Node reader and browser range reader; regulations stay in the demo. Missing country rules, overlapping territory contexts and unknown distances do not produce a discharge decision. The example measures the coastline in the selected release and does not model legal baselines or the remaining conditions in section 96. Its attribution follows the selected release: OpenStreetMap for `v0.1.0`, World Countries for the `v0.2.0` build.
