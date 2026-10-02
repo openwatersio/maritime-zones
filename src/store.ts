@@ -1,6 +1,6 @@
 /**
  * Where tiles come from: memory, then the on-disk cache, then the GitHub
- * release matching this package's version. Every tile is checked against the
+ * release selected by package.json's tileVersion. Every tile is checked against the
  * sha256 in tiles.json, which ships with the package, before it is used.
  */
 import { createHash } from "node:crypto";
@@ -11,15 +11,15 @@ import { readFileSync } from "node:fs";
 import { zstdDecompressSync } from "node:zlib";
 
 const DATA = new URL("../dist/", import.meta.url);
-const VERSION: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+const TILE_VERSION: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).tileVersion;
 const RELEASES = "https://github.com/openwatersio/maritime-zones/releases/download";
 /** Tiles downloaded at once by download(). */
 const PARALLEL = 4;
 
 export interface Config {
-  /** Where downloaded tiles are kept. Default: $XDG_CACHE_HOME or ~/.cache, under openwaters/maritime-zones/v<version>. */
+  /** Where downloaded tiles are kept. Default: $XDG_CACHE_HOME or ~/.cache, under openwaters/maritime-zones/v<tileVersion>. */
   cacheDir: string;
-  /** Where tiles are downloaded from. Default: this version's GitHub release. */
+  /** Where tiles are downloaded from. Default: the tileVersion GitHub release. */
   baseUrl: string;
   /** Download missing tiles. With false, a missing tile throws MISSING_TILE and nothing touches the network. */
   download: boolean;
@@ -30,9 +30,9 @@ const defaults = (): Config => ({
     process.env.XDG_CACHE_HOME || join(homedir(), ".cache"),
     "openwaters",
     "maritime-zones",
-    `v${VERSION}`,
+    `v${TILE_VERSION}`,
   ),
-  baseUrl: `${RELEASES}/v${VERSION}`,
+  baseUrl: `${RELEASES}/v${TILE_VERSION}`,
   download: true,
 });
 

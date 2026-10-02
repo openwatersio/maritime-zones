@@ -28,7 +28,7 @@ jobs:
       - run: npm ci
       - name: Use the existing tile release
         run: |
-          TAG=$(gh release view --json tagName --jq .tagName)
+          TAG="v$(node -p "require('./package.json').tileVersion")"
           TILE_VERSION="$TAG" npm run demo:build
           mkdir -p "public/$TAG"
           gh release download "$TAG" --dir "public/$TAG"

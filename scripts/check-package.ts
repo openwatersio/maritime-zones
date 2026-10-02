@@ -6,8 +6,9 @@ import { join } from "node:path";
 import { ROOT } from "./layers.ts";
 
 const work = mkdtempSync(join(tmpdir(), "maritime-zones-package-"));
+const { tileVersion } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 try {
-  // CI uses released metadata as a fixture; publishing runs prepack against the exact version.
+  // CI uses released metadata as a fixture; publishing runs prepack against tileVersion.
   const [pack] = JSON.parse(
     execFileSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", work], {
       cwd: ROOT,
@@ -45,15 +46,28 @@ try {
       "--input-type=module",
       "--eval",
       `import assert from 'node:assert/strict';
+      import { join } from 'node:path';
       globalThis.fetch = () => { throw new Error('The smoke test must not use the network'); };
       const { configure, tilesFor, whereAmI } = await import('@openwaters/maritime-zones');
+      configure({ download: false });
+      await assert.rejects(whereAmI(51.25, 2.85), error => {
+        assert.equal(error.code, 'MISSING_TILE');
+        assert(error.message.includes(join(process.env.XDG_CACHE_HOME, 'openwaters', 'maritime-zones', 'v${tileVersion}')));
+        return true;
+      });
+      const requests = [];
+      globalThis.fetch = async url => { requests.push(url); return new Response('', { status: 404 }); };
+      configure();
+      await assert.rejects(whereAmI(51.25, 2.85), { code: 'DOWNLOAD_FAILED' });
+      assert.deepEqual(requests, ['https://github.com/openwatersio/maritime-zones/releases/download/v${tileVersion}/n50e0.fgb.zst']);
+      globalThis.fetch = () => { throw new Error('The smoke test must not use the network'); };
       configure({ download: false, cacheDir: 'empty-cache' });
       const tiles = tilesFor({ lat: 48.6, lon: -123.2, radiusNm: 5 });
       assert.deepEqual(tiles.map(t => t.tile), ['n40w130']);
       assert(tiles[0].bytes > 0);
       await assert.rejects(whereAmI(51.25, 2.85), { code: 'MISSING_TILE', tile: 'n50e0' });`,
     ],
-    { cwd: work, stdio: "pipe" },
+    { cwd: work, stdio: "pipe", env: { ...process.env, XDG_CACHE_HOME: join(work, "cache") } },
   );
   writeFileSync(
     join(work, "consumer.mts"),

@@ -23,7 +23,7 @@ test("builds World Countries rings into seekable land tiles, outside the zone ta
       mkdirSync(dirname(join(work, file)), { recursive: true });
       copyFileSync(new URL(`../${file}`, import.meta.url), join(work, file));
     }
-    writeFileSync(join(work, "package.json"), '{"type":"module","version":"0.1.0"}');
+    writeFileSync(join(work, "package.json"), '{"type":"module","version":"0.1.1","tileVersion":"0.1.0"}');
     symlinkSync(fileURLToPath(new URL("../node_modules", import.meta.url)), join(work, "node_modules"));
     for (const key of ["internal", "archipelagic", "12nm", "24nm", "eez", "high_seas", "land", "countries"]) {
       mkdirSync(join(work, "tmp", key), { recursive: true });
