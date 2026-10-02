@@ -9,7 +9,7 @@
 - `benchmarks/` times the queries offline and over HTTP range reads, working tree against a git revision. See Performance below.
 - `scripts/release-notes.ts` prints the release notes for the current build.
 - `scripts/update-notes.ts` prints the monthly check's WFS load and source changes.
-- `scripts/package-metadata.ts` downloads the package version's released metadata before packing. `scripts/build-package.ts` bundles the Node reader into `lib/index.js`; `tsconfig.package.json` emits its declarations. `scripts/check-package.ts` installs a tarball and checks the offline public API and consumer types.
+- `scripts/package-metadata.ts` downloads the metadata for `tileVersion` in `package.json` before packing. `scripts/build-package.ts` bundles the Node reader into `lib/index.js`; `tsconfig.package.json` emits its declarations. `scripts/check-package.ts` installs a tarball and checks the offline public API and consumer types.
 - `src/` is the reader: `index.ts` has the queries, `store.ts` finds tiles in memory, the cache or the GitHub release and checks them, and `tiles.ts` maps areas to tile names.
 - `test/` holds vitest cases. `queries.test.ts` checks answers at fixed points. `store.test.ts` checks downloading and caching against a local server that serves `dist/tiles` the way a release serves assets. Both read `dist/`.
 
@@ -44,7 +44,7 @@ npm pack --dry-run --ignore-scripts
 npm run package:check
 ```
 
-CI does not run the full vitest suite, because the query tests need built tiles, and building them downloads every layer from VLIZ. The packaging smoke test uses the newest released metadata as a fixture and skips prepack, so CI can run before the package version's tile release exists. It installs with npm's nested strategy to catch undeclared runtime imports, calls `tilesFor()` without network access, and checks the shipped declarations with TypeScript. Publishing always runs prepack against the exact version's release. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
+CI does not run the full vitest suite, because the query tests need built tiles, and building them downloads every layer from VLIZ. The packaging smoke test uses the newest released metadata as a fixture and skips prepack, so CI can run before a new tile release exists. It installs with npm's nested strategy to catch undeclared runtime imports, calls `tilesFor()` without network access, and checks the shipped declarations with TypeScript. Publishing always runs prepack against the release pinned by `tileVersion`. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
 
 A separate CI job benchmarks the queries when `src/`, `benchmarks/`, the dependencies or the workflow change. It uses the released tiles, so it needs no build.
 
@@ -57,11 +57,11 @@ gh release download -p tiles.json -p zones.json -D dist
 node benchmarks/run.ts --base origin/main
 ```
 
-The first line is only needed without a local build: the reader checks tiles against the hashes in `dist/tiles.json`, so it must be a release's copy. Tiles are downloaded from the release named by `package.json`; between a version bump and its release, pass `--release v<newest>` to use the release the metadata came from, which is what CI always does. The command measures uncommitted edits too. Omit `--base` to compare against `HEAD`.
+The first line is only needed without a local build: the reader checks tiles against the hashes in `dist/tiles.json`, so it must be a release's copy. Tiles are downloaded from `v<tileVersion>` as pinned in `package.json`; between a tile version bump and its release, pass `--release v<newest>` to use the release the metadata came from, which is what CI always does. A reader-only version bump keeps the same tiles. The command measures uncommitted edits too. Omit `--base` to compare against `HEAD`.
 
 Each workload in [`benchmarks/cases.json`](benchmarks/cases.json) is one query at one position, and runs in two modes. `offline` calls the public API over tiles in the cache, the way a Node consumer does. `range` drives the shared query code in `src/queries.ts` over HTTP range reads of the compressed tiles from a local server, the way the browser demo does, and also counts the requests and bytes one call makes. Pass `--mode offline` or `--mode range` to run one, and `--skip` with a regular expression matched against workload names to leave some out. Bases older than `src/queries.ts` only run offline.
 
-Both revisions use the current harness, tiles, dependencies and machine. The base is exported to a temporary directory, so the command never switches your checkout. Before timing, every tile the workloads can touch is downloaded into the reader's cache (`~/.cache/openwaters/maritime-zones/v<version>`, or `--cache` to use another directory, such as `dist/tiles` after a local build). Each workload gets seven pairs of base and candidate processes, alternating which runs first. A process warms up for 300 milliseconds, which includes loading its tiles, then the first pair calibrates a batch of at least 100 milliseconds and later pairs reuse it.
+Both revisions use the current harness, tiles, dependencies and machine. The base is exported to a temporary directory, so the command never switches your checkout. Before timing, every tile the workloads can touch is downloaded into the reader's cache (`~/.cache/openwaters/maritime-zones/v<tileVersion>`, or `--cache` to use another directory, such as `dist/tiles` after a local build). Each workload gets seven pairs of base and candidate processes, alternating which runs first. A process warms up for 300 milliseconds, which includes loading its tiles, then the first pair calibrates a batch of at least 100 milliseconds and later pairs reuse it.
 
 The table reports median milliseconds per call and, for range mode, requests and bytes per call. A median slowdown above 20 percent fails the command, and so does a 20 percent rise in requests or bytes; `--threshold 10` tests another limit. The threshold is a policy limit; `npm test` and `scripts/check.ts` are the accuracy gates, and a workload whose answer differs between revisions fails the comparison outright. Timing is noisy on a busy machine, so repeat a suspicious run. Requests and bytes are exact.
 
@@ -71,7 +71,7 @@ Raw samples, checksums, revisions, harness hash and machine metadata are saved u
 node benchmarks/compare.ts base.json candidate.json 20
 ```
 
-CI compares a pull request with its base, or a push to `main` with the previous commit, publishes the table in the Actions summary and keeps the reports as an artifact for 30 days. The tile cache is kept between runs, keyed on the package version and the workloads.
+CI compares a pull request with its base, or a push to `main` with the previous commit, publishes the table in the Actions summary and keeps the reports as an artifact for 30 days. The tile cache is kept between runs, keyed on the tile release and the workloads.
 
 A pull request intended to improve the performance of a benchmarked function must also update the README's Performance section with its candidate numbers and CI run link. Keep the README table to current measurements; put the before-and-after comparison in the pull request body.
 
@@ -93,7 +93,7 @@ TILE_VERSION=v0.1.0 npm run demo:dev
 
 Open `http://127.0.0.1:4173/`. The local server supports the suffix byte ranges the seekable reader requires. To preview a different release, download its assets into `public/<tag>/` and set `TILE_VERSION=<tag>` when building or starting the preview. For Node snippets, also download that release's `tiles.json` and `zones.json` into `dist/`.
 
-The **Deploy demos** workflow rebuilds Pages on relevant pushes to main, or on manual dispatch. It downloads the latest existing tile release and builds only the demo: no WFS requests, source rebuild, release replacement or npm publication. The release workflow also builds the demo when publishing new tiles. Both deployments preserve the navigation and discharge notice and the attribution for the selected tile release.
+The **Deploy demos** workflow rebuilds Pages on relevant pushes to main, or on manual dispatch. It downloads the tile release pinned by `tileVersion` and builds only the demo: no WFS requests, source rebuild, release replacement or npm publication. The release workflow also builds the demo when publishing new tiles. Both deployments preserve the navigation and discharge notice and the attribution for the selected tile release.
 
 ## Monthly upstream check
 
@@ -127,12 +127,12 @@ World Countries tiles ship from `v0.2.0`. A release built from new coastline dat
 
 See [Tile format](docs/tile-format.md) for the seekable zstd format, compression measurements, range reads and what the download hashes cover.
 
-Tiles ship as flat assets on the GitHub release `v<version>`, where `<version>` is the one in `package.json`: every `dist/tiles/*.fgb.zst` plus `dist/zones.json`, `dist/tiles.json` and `NOTICE`. Raw `.fgb` intermediates stay local for the GDAL distance oracle. The reader downloads tiles from the release matching its own version and checks them against the hashes in its packaged `tiles.json`, so a release is never replaced. New tiles need a new version.
+Tiles ship as flat assets on the GitHub release `v<tileVersion>`, where `tileVersion` is pinned in `package.json`: every `dist/tiles/*.fgb.zst` plus `dist/zones.json`, `dist/tiles.json` and `NOTICE`. Raw `.fgb` intermediates stay local for the GDAL distance oracle. The reader downloads tiles from that pinned release and checks them against the hashes in its packaged `tiles.json`, so a release is never replaced. New tiles need a new version.
 
 To release tiles:
 
 1. Review unfinished specs and plans, preserve lasting guidance in maintained docs, and remove completed plans. Have a human review documentation changes in the release PR. If either source has changed, run `npm run fetch -- --fresh` and commit the new `upstream.lock.json` in a pull request. The release workflow refuses to publish data that differs from the committed lock.
-2. Bump `version` in `package.json` in a pull request.
+2. Bump `tileVersion` in `package.json` in a pull request. Also bump the npm `version` and update `package-lock.json` so consumers can install the reader with the new tile pin.
 3. Run the **Release tiles** workflow from the Actions tab. It fetches the maritime boundaries and World Countries from VLIZ, builds and compresses the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads every compressed tile plus both metadata files and NOTICE, checks the count, publishes, verifies a query from an empty cache and deploys the identical files to Pages.
 
 Uploads are spaced eight seconds apart to stay below [GitHub's content-creation limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), so uploading a full global build takes about 80 minutes. Rate limits honor GitHub's retry delay, with bounded backoff. If a run stops with a draft, rerun the workflow: it checks every existing asset's hash and uploads only missing files. If those hashes differ, delete the draft and start again. Published releases cannot be resumed or replaced.
@@ -145,13 +145,13 @@ VLIZ has approved the proposed derived-tile redistribution through GitHub releas
 
 Reader fixes and performance improvements must ship in a new npm version for package consumers to receive them. Merging to `main` or deploying the Pages demo does not update an already published package. Use a patch release for a compatible fix or optimization, and update both `package.json` and `package-lock.json` (for example, `npm version patch --no-git-tag-version`). The change PR must include the bump or link a follow-up release PR; that release must include the merged reader changes.
 
-The npm and tile versions are coupled: `scripts/package-metadata.ts` downloads metadata from `v<package version>`, and `src/store.ts` uses that same release for tile downloads and the cache. Even when a reader change leaves the data unchanged, publish the matching tile release through the release procedure above before running **Publish npm package**. A version bump alone cannot reuse an older tile release, and published npm versions and tile assets must not be overwritten.
+The npm `version` and `tileVersion` are independent. For a reader-only release, bump `version` and keep `tileVersion` unchanged: for example, reader `0.2.1` can use tiles `0.2.0`. `scripts/package-metadata.ts` takes metadata from `v<tileVersion>`, and `src/store.ts` uses that same release for downloads and the cache. Existing verified cache files remain reusable across reader upgrades. Dispatch **Publish npm package** after merging the version bump; no tile rebuild, upload or new GitHub release is needed. Change `tileVersion` only when adopting new tile assets, publish those assets first, and never overwrite a published npm version or tile release.
 
 After publishing, verify the workflow succeeded and `npm view @openwaters/maritime-zones version` reports the intended version. Record that version in the release PR so consumers know which version to install or upgrade to. Documentation-only changes do not need an npm release.
 
 ### npm publication
 
-`@openwaters/maritime-zones` is published after its tiles: once the **Release tiles** run has finished, dispatch **Publish npm package** on `main`. It verifies packaging and publishes `v<package version>` through npm trusted publishing with provenance; no npm token is stored in GitHub. The trusted publisher on npmjs.com is owner `openwatersio`, repository `maritime-zones`, workflow `publish.yml`, no environment. Releases created with the tile workflow's `GITHUB_TOKEN` do not trigger other workflows, which is why the dispatch is explicit; a release published by a human triggers it at the release tag. Verify the workflow result and `npm view @openwaters/maritime-zones version` before reporting a publication complete.
+To publish `@openwaters/maritime-zones`, ensure the release pinned by `tileVersion` exists, then dispatch **Publish npm package** on `main`. It verifies packaging and publishes `v<package version>` through npm trusted publishing with provenance; no npm token is stored in GitHub. The trusted publisher on npmjs.com is owner `openwatersio`, repository `maritime-zones`, workflow `publish.yml`, no environment. npm publication is manual; publishing a tile release does not trigger it. Verify the workflow result and `npm view @openwaters/maritime-zones version` before reporting a publication complete.
 
 To publish by hand instead, for example while the trusted publisher is not registered, run these from the reviewed commit with a maintainer's npm login and two-factor code:
 
@@ -167,7 +167,7 @@ npm publish --otp=<code>
 
 Never dispatch the npm workflow for a version that was published by hand; it fails on the existing version.
 
-Enable GitHub Pages with GitHub Actions as its source before publishing. The mirror serves the latest release at `https://openwatersio.github.io/maritime-zones/v<version>/`, with the same filenames and SHA-256 as the release. Set `baseUrl` to that URL for whole-tile downloads. For browser range queries, host the demo on the same Pages origin and use FlatGeobuf with `seekableZstd: true`; Pages does not expose the `Content-Range` header to other origins. See [Tile format](docs/tile-format.md).
+Enable GitHub Pages with GitHub Actions as its source before publishing. The mirror serves the pinned tile release at `https://openwatersio.github.io/maritime-zones/v<tileVersion>/`, with the same filenames and SHA-256 as the release. Set `baseUrl` to that URL for whole-tile downloads. For browser range queries, host the demo on the same Pages origin and use FlatGeobuf with `seekableZstd: true`; Pages does not expose the `Content-Range` header to other origins. See [Tile format](docs/tile-format.md).
 
 ## Gotchas
 

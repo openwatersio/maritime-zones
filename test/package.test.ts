@@ -18,10 +18,10 @@ test("package builds remove obsolete JavaScript and declarations before emitting
   expect(existsSync(join(ROOT, "lib/index.d.ts"))).toBe(true);
 });
 
-test("packaging takes both metadata files from the package version's release", async () => {
+test("packaging takes both metadata files from the pinned tile release", async () => {
   const fetch = vi.fn(async (url: string) => new Response(url.endsWith("tiles.json") ? '{"tiles":{}}' : "[]"));
   vi.stubGlobal("fetch", fetch);
-  expect(await releaseMetadata("0.2.0")).toEqual([
+  expect(await releaseMetadata()).toEqual([
     ["tiles.json", '{"tiles":{}}'],
     ["zones.json", "[]"],
   ]);

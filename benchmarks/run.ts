@@ -59,8 +59,8 @@ const git = (...args: string[]) => capture("git", args);
 const baseRevision = git("rev-parse", "--verify", "--end-of-options", `${values.base}^{commit}`);
 const revision = git("rev-parse", "HEAD");
 const dirty = git("status", "--porcelain").length > 0;
-// A version bump lands before its release exists, so the tiles may have to come from an older tag.
-const tag = values.release ?? `v${JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version}`;
+// --release allows comparisons against another tile dataset with its matching metadata.
+const tag = values.release ?? `v${JSON.parse(readFileSync(join(root, "package.json"), "utf8")).tileVersion}`;
 assert.match(tag, /^v\d+\.\d+\.\d+/, "Invalid release tag");
 // Mirrors the reader's defaults in src/store.ts, so a developer's queries and benchmarks share tiles.
 const baseUrl = `https://github.com/openwatersio/maritime-zones/releases/download/${tag}`;

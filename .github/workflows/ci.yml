@@ -22,7 +22,7 @@ jobs:
       - run: npx tsc -p .
       - run: npx vitest run test/regulations.test.ts test/package.test.ts
       - run: npm run demo:build
-      # A version bump precedes its tile release; latest metadata is only an offline packaging fixture.
+      # A tileVersion bump precedes its release; latest metadata is only an offline packaging fixture.
       - name: Package metadata fixture
         env:
           GH_TOKEN: ${{ github.token }}
@@ -54,7 +54,7 @@ jobs:
           cache: npm
       - if: steps.changes.outputs.run == 'true'
         run: npm ci
-      # The newest release, because a version bump lands before its release exists.
+      # The newest release, because a tileVersion bump lands before its release exists.
       # The reader checks tiles against these hashes, so both files must come from the same release as the tiles.
       - if: steps.changes.outputs.run == 'true'
         name: Tile metadata from the newest release

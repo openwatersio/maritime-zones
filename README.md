@@ -46,7 +46,7 @@ Distance results carry `distanceNm`, the initial great-circle `bearingDeg` and t
 
 ## Tiles and the cache
 
-The package carries `zones.json` and `tiles.json`, which list every tile with its compressed download size and sha256, but not the tiles themselves. A query works out which 10° tiles its search needs, downloads any that aren't cached from the GitHub release matching the package version, checks each against its sha256, and keeps it in the cache for next time. The cache stores compressed `.fgb.zst` downloads; the reader checks the compressed bytes before caching or decompressing them with Node 24. A tile that fails its check is never used or cached.
+The package carries `zones.json` and `tiles.json`, which list every tile with its compressed download size and sha256, but not the tiles themselves. A query works out which 10° tiles its search needs, downloads any that aren't cached from the GitHub release selected by `tileVersion` in `package.json`, checks each against its sha256, and keeps it in the cache for next time. Reader versions can share the same tile release and cache. The cache stores compressed `.fgb.zst` downloads; the reader checks the compressed bytes before caching or decompressing them with Node 24. A tile that fails its check is never used or cached.
 
 To be ready before losing signal, download an area ahead of time. Pass a box or a circle, and add the search radius you care about, because a query near the edge of an area can need tiles beyond it:
 
@@ -61,8 +61,8 @@ configure({ download: false }); // never touch the network
 
 `configure()` takes:
 
-- `cacheDir`: where tiles are kept. Defaults to `$XDG_CACHE_HOME/openwaters/maritime-zones/v<version>`, or `~/.cache/…` when that variable is unset.
-- `baseUrl`: where tiles are downloaded from. Defaults to `https://github.com/openwatersio/maritime-zones/releases/download/v<version>`.
+- `cacheDir`: where tiles are kept. Defaults to `$XDG_CACHE_HOME/openwaters/maritime-zones/v<tileVersion>`, or `~/.cache/…` when that variable is unset.
+- `baseUrl`: where tiles are downloaded from. Defaults to `https://github.com/openwatersio/maritime-zones/releases/download/v<tileVersion>`.
 - `download`: `true` by default. With `false`, a query that needs a tile that isn't cached throws.
 
 Queries never answer from partial data. A tile they can't get throws an error that names the tile, with `code` set to `MISSING_TILE` (not cached and downloads are off), `DOWNLOAD_FAILED` or `CHECKSUM`.

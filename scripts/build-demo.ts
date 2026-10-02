@@ -6,7 +6,8 @@ import { createServer } from "node:http";
 import { extname, resolve } from "node:path";
 
 const out = join(ROOT, "public");
-const version = process.env.TILE_VERSION || `v${JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version}`;
+const version =
+  process.env.TILE_VERSION || `v${JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).tileVersion}`;
 if (!/^v\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version)) throw new Error(`Invalid tile version: ${version}`);
 mkdirSync(out, { recursive: true });
 copyFileSync(join(ROOT, "demo/index.html"), join(out, "index.html"));

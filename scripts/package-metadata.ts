@@ -3,7 +3,8 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ROOT } from "./layers.ts";
 
-export async function releaseMetadata(version: string) {
+export async function releaseMetadata(version?: string) {
+  version ??= JSON.parse(await readFile(join(ROOT, "package.json"), "utf8")).tileVersion;
   return Promise.all(
     ["tiles.json", "zones.json"].map(async (name) => {
       const response = await fetch(
@@ -20,8 +21,7 @@ export async function releaseMetadata(version: string) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { version } = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
-  const files = await releaseMetadata(version);
+  const files = await releaseMetadata();
   await mkdir(join(ROOT, "dist"), { recursive: true });
   for (const [name, json] of files) await writeFile(join(ROOT, "dist", name), json);
 }

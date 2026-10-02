@@ -1,7 +1,7 @@
 name: Release tiles
 
 # Builds the tiles from the VLIZ WFS and publishes them as assets on the GitHub
-# release v<package.json version>, where the reader downloads them from.
+# release v<package.json tileVersion>, where the reader downloads them from.
 # Manual only, and a dry run unless told otherwise. No npm publishing.
 on:
   workflow_dispatch:
@@ -44,12 +44,12 @@ jobs:
 
       - name: Choose the release tag
         run: |
-          TAG="v$(node -p "require('./package.json').version")"
+          TAG="v$(node -p "require('./package.json').tileVersion")"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           # Consumers cache tiles by version and check them against the hashes
           # shipped with that version, so a published release is never replaced.
           if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null)" = "false" ]; then
-            echo "::error::Release $TAG already exists. Bump the version in package.json to release new tiles."
+            echo "::error::Release $TAG already exists. Bump tileVersion in package.json to release new tiles."
             exit 1
           fi
 
