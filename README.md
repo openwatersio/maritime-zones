@@ -89,6 +89,8 @@ Median milliseconds per call on a GitHub-hosted Ubuntu runner with the `v0.1.0` 
 
 A query far from any other territory is slow because its search box grows until it holds the answer, up to 480 NM, and every tile index under the box returns all of its coastline features too. The World Countries coastline in `0.2.0` has 294 features instead of 879,204, so its release will change these numbers. CI benchmarks every change to the queries; [CONTRIBUTING](CONTRIBUTING.md#performance) explains how to run the harness.
 
+The search uses the first matching feature's distance to bound its next pass. With the `v0.1.0` tiles, this keeps the Norwegian Sea workload to 588 requests and 41.23 MB per call, and the Labrador Sea workload to 234 requests and 15.11 MB per call.
+
 ## Data
 
 | Layer               | Source                                | Features |
