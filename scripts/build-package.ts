@@ -22,7 +22,7 @@ await build({
   target: "node24",
   packages: "external",
   // FlatGeobuf 4.5.0's deep entry logs every index node: https://github.com/flatgeobuf/flatgeobuf/pull/533
-  alias: { "flatgeobuf/lib/mjs/geojson.js": join(ROOT, "node_modules/flatgeobuf/lib/mjs/geojson.js") },
+  alias: { flatgeobuf: join(ROOT, "node_modules/flatgeobuf") },
   drop: ["console"],
 });
 copyFileSync(join(ROOT, "node_modules/flatgeobuf/LICENSE"), join(ROOT, "lib/flatgeobuf.LICENSE"));

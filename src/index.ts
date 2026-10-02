@@ -1,4 +1,5 @@
-import { deserialize } from "flatgeobuf/lib/mjs/geojson.js";
+import { ArrayReader } from "flatgeobuf/lib/mjs/array-reader.js";
+import { fromFeature } from "./feature.ts";
 import { fetchAll, listed, load, zoneTable } from "./store.ts";
 import { type Area, tilesIn } from "./tiles.ts";
 import { createQueries, type Zone } from "./queries.ts";
@@ -8,8 +9,12 @@ export type { Area } from "./tiles.ts";
 export type { Layer, Zone, Hit, Options } from "./queries.ts";
 
 export const { whereAmI, nearestTerritory, distanceTo, distanceToLand } = createQueries(
-  async function* (tile, rect) {
-    yield* deserialize(await load(tile), { rect });
+  async function* (tile, rect, kind) {
+    const reader = ArrayReader.open(await load(tile));
+    for await (const { id, feature } of reader.selectBbox(rect)) {
+      const decoded = fromFeature(id, feature, reader.header, kind);
+      if (decoded) yield decoded;
+    }
   },
   listed,
   () => zoneTable<Zone>(),

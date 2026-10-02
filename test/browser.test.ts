@@ -50,10 +50,13 @@ it("retries a failed WASM download before initializing the browser codec", async
     });
   });
   try {
-    const { whereAmI } = await import("../demo/reader.ts");
+    const { whereAmI, distanceToLand } = await import("../demo/reader.ts");
     await expect(whereAmI(51.25, 2.85)).rejects.toThrow("Could not load zstd.wasm: HTTP 503");
     expect((await whereAmI(51.25, 2.85)).map((z) => `${z.layer}:${z.iso_ter}`)).toEqual(["12nm:BEL", "eez:BEL"]);
     expect(wasmRequests).toBe(2);
+    const land = await distanceToLand(66.2, 8.4);
+    expect(land?.distanceNm).toBeCloseTo(79.25426694593823, 6);
+    expect(land?.zone).toBeNull();
   } finally {
     vi.unstubAllGlobals();
   }
