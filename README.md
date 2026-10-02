@@ -108,6 +108,22 @@ A query far from any other territory is slow because its search box grows until 
 
 The search uses the first matching feature's distance to bound its next pass.
 
+## Memory
+
+These figures come from the published `0.2.0` package in a Linux arm64 container (Node 24.21 under Docker on an Apple M1 Ultra), measured on 2026-10-02. Each fix calls `whereAmI()`, `distanceToLand()` and `nearestTerritory()`, as a Signal K plugin might on a position update, for 200 positions along a track. A bare Node process uses about 75 MB of resident memory before the package loads. No Raspberry Pi has been measured yet; expect the same memory and slower fixes.
+
+| Track                                          | Tiles held, MB | Resident MB | Resident MB, small young generation | Median ms per fix |
+| ---------------------------------------------- | -------------: | ----------: | ----------------------------------: | ----------------: |
+| IJmuiden approach to Amsterdam                 |              5 |         250 |                                 135 |         4.1 / 5.6 |
+| Amsterdam to Bergen                            |             60 |         520 |                                 264 |         6.0 / 7.5 |
+| Norwegian Sea, 300 NM from any other territory |             35 |         490 |                                 283 |         191 / 267 |
+
+The package keeps only the tiles it has read, decompressed, plus a JavaScript heap of about 10 MB. The rest of the resident memory is garbage from decoding features during a query, which V8 holds before collecting it. It levels off: 3,000 fixes off IJmuiden end at the same resident memory as 500. Calling only `whereAmI()` there settles at 120 MB.
+
+The small young generation column runs Node with `--max-semi-space-size=1`, which roughly halves resident memory and makes each fix 25 to 40% slower. A Signal K plugin shares the server's process, so the flag goes in the server's `NODE_OPTIONS` and applies to every plugin.
+
+A tile in memory is about five times its download size. The Amsterdam tile, `n50e0`, is 1.0 MB to download and 4.8 MB decompressed. The largest, `n60e20` in the Gulf of Bothnia, is 22.6 MB. Tiles stay in memory until the process exits, so a long passage adds up: every tile together is 738 MB.
+
 ## Data
 
 | Layer               | Source                                | Features |
