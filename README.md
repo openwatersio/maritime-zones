@@ -59,6 +59,23 @@ await download({ minLat: 47, minLon: -125, maxLat: 51, maxLon: -122 }); // { til
 configure({ download: false }); // never touch the network
 ```
 
+A cruising area needs a few megabytes. These are the `v0.2.0` download sizes that `tilesFor()` reports for some sample areas:
+
+| Area                              | Tiles |    MB |
+| --------------------------------- | ----: | ----: |
+| Amsterdam, 25 NM around           |     1 |  1.00 |
+| Amsterdam, 150 NM around          |     2 |  1.73 |
+| Dutch and Belgian coast           |     1 |  1.00 |
+| Salish Sea                        |     2 |  1.28 |
+| English Channel                   |     4 |  5.77 |
+| Western Mediterranean             |     6 |  4.01 |
+| Caribbean                         |    12 |  5.47 |
+| Norwegian coast to the North Cape |    12 | 14.24 |
+| Indonesia                         |    18 | 17.20 |
+| The whole world                   |   636 |   142 |
+
+The cost follows the 10° grid, not the area's size. An area inside one tile costs that tile, and a small area that straddles a tile line costs two. Tiles with dense, intricate coastlines are the largest, such as Norway's fjords and the Indonesian archipelago. For comparison, the raw Marine Regions zone layers this package is built from are about 680 MB of GeoJSON.
+
 `configure()` takes:
 
 - `cacheDir`: where tiles are kept. Defaults to `$XDG_CACHE_HOME/openwaters/maritime-zones/v<tileVersion>`, or `~/.cache/…` when that variable is unset.
