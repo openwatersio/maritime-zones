@@ -77,6 +77,16 @@ A pull request intended to improve the performance of a benchmarked function mus
 
 Performance improvements to the published reader also need an [npm release](#reader-changes-and-npm-releases). Include the version bump in the PR or link a follow-up release PR.
 
+Measure memory against the built package so FlatGeobuf's debug logging is removed, as it is for npm consumers:
+
+```sh
+npm run package:build
+node --heap-prof benchmarks/memory.ts --case ijmuiden
+node benchmarks/memory.ts --case norwegian-sea --fixes 500 --profile /tmp/maritime-allocations.json
+```
+
+The harness warms the tiles, then calls `whereAmI()`, `distanceToLand()` and `nearestTerritory()` for each fix and checks that their answers stay constant. `--source` selects another checkout's built package and defaults to the current directory; `--cache` selects a directory of verified tiles and defaults to `dist/tiles`. The JSON output includes the runtime, answer checksums, time per fix and final resident, heap and buffer memory. `--heap-prof` saves Node's retained-allocation profile; `--profile` additionally samples allocations collected by both minor and major GC and reports their total bytes. Profiling adds overhead, so compare timing and resident memory in separate runs without `--profile`. Compare revisions using the same runtime, tiles, fix count and flags, in separate processes. These measurements describe that machine and Node version; they do not predict a Raspberry Pi's memory use.
+
 ## Pages demos
 
 `demo/` contains the five map views, Browser and Node.js snippets, and the separate Canadian 3 NM example rule. `src/queries.ts` supplies the same geometry logic to the Node reader and browser range reader; regulations stay in the demo. Missing country rules, overlapping territory contexts and unknown distances do not produce a discharge decision. The example measures the coastline in the selected release and does not model legal baselines or the remaining conditions in section 96. Its attribution follows the selected release: OpenStreetMap for `v0.1.0`, World Countries for the `v0.2.0` build.
