@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { compare, type Report, type Sample } from "../benchmarks/compare.ts";
 import { digest } from "../benchmarks/digest.ts";
-import { configure, whereAmI } from "../src/index.ts";
+import { ahead, configure, whereAmI } from "../src/index.ts";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const TILES = join(ROOT, "dist", "tiles");
@@ -30,6 +30,21 @@ const report = (samplesMs: number[], extra: Partial<Sample> = {}): Report => ({
 const seven = (ms: number) => Array<number>(7).fill(ms);
 
 describe("compare", () => {
+  test("explicit unavailable base workloads are measured and displayed as new", () => {
+    const base = report(seven(10));
+    base.unavailable = [{ name: "ahead/dutch-coast", mode: "offline" }];
+    const candidate = structuredClone(base);
+    delete candidate.unavailable;
+    candidate.results.push(sample(seven(3), { name: "ahead/dutch-coast", checksum: 123 }));
+    const result = compare(base, candidate);
+    expect(result.regressed).toBe(false);
+    expect(result.markdown).toMatch(/ahead\/dutch-coast.*new/);
+    const onlyNew = { ...base, results: [] };
+    const onlyCandidate = { ...candidate, results: candidate.results.slice(1) };
+    expect(compare(onlyNew, onlyCandidate).regressed).toBe(false);
+    delete base.unavailable;
+    expect(() => compare(base, candidate)).toThrow(/Workload set changed/);
+  });
   test("gates median regressions, tolerates outliers, and reports improvements", () => {
     const base = report([10, 10, 10, 10, 10, 10, 100]);
     const regression = compare(base, report([12.1, 12.1, 12.1, 12.1, 12.1, 12.1, 1]), 20);
@@ -117,6 +132,34 @@ describe("digest", () => {
     zone: zone(3293),
     ...extra,
   });
+  test("course fingerprints include start, distance, point, kind, both parties and joint claims", () => {
+    const answer: any = {
+      start: [{ ...zone(1), iso_ter: "NLD" }],
+      crossings: [
+        {
+          kind: "water",
+          distanceNm: 1,
+          point: [51, 2],
+          leaving: [{ ...zone(1), iso_ter: "NLD" }],
+          entering: [{ ...zone(2), iso_ter: "BEL", iso_ter2: "FRA" }],
+        },
+      ],
+    };
+    const mutations: ((a: any) => void)[] = [
+      (a) => (a.start[0].iso_ter = "FRA"),
+      (a) => (a.crossings[0].distanceNm = 2),
+      (a) => (a.crossings[0].point[0] = 52),
+      (a) => (a.crossings[0].leaving = []),
+      (a) => (a.crossings[0].entering[0].iso_ter2 = "DEU"),
+      (a) => (a.crossings[0].kind = "coast"),
+    ];
+    for (const mutate of mutations) {
+      const changed = structuredClone(answer);
+      mutate(changed);
+      expect(digest(changed)).not.toBe(digest(answer));
+    }
+    expect(digest(answer)).toBe(digest(structuredClone(answer)));
+  });
 
   test("tells apart zone sets with the same id sum and hits that differ only in bearing, point or zone", () => {
     expect(digest([zone(1), zone(4)])).not.toBe(digest([zone(2), zone(3)]));
@@ -155,6 +198,16 @@ describe("measure", () => {
     expect(result.requests).toBeUndefined();
     expect(measure("offline", "whereAmI/off-ostend", "3").iterations).toBe(3);
   }, 60_000);
+  test("course measurements agree between offline and range modes", async () => {
+    configure({ cacheDir: TILES, download: false });
+    const expected = digest(await ahead(52.2, 4.2, 225, { maxNm: 120 }));
+    const offline = measure("offline", "ahead/dutch-coast");
+    const range = measure("range", "ahead/dutch-coast");
+    expect(offline.checksum).toBe(expected);
+    expect(range.checksum).toBe(expected);
+    expect(range.requests).toBeGreaterThan(0);
+    expect(range.bytes).toBeGreaterThan(0);
+  }, 60000);
 
   test("the range sample counts requests and bytes and agrees with the offline answer", () => {
     const offline = measure("offline", "nearestTerritory/dover");

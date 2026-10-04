@@ -3,6 +3,10 @@
   "sampleMs": 100,
   "samples": 7,
   "cases": [
+    { "name": "ahead/north-sea-belgium", "query": "ahead", "lat": 51.8, "lon": 2.85, "cogDeg": 180, "maxNm": 80 },
+    { "name": "ahead/dutch-coast", "query": "ahead", "lat": 52.2, "lon": 4.2, "cogDeg": 225, "maxNm": 120 },
+    { "name": "ahead/fiji-antimeridian", "query": "ahead", "lat": -17.2, "lon": 179.8, "cogDeg": 90, "maxNm": 120 },
+    { "name": "ahead/atlantic-empty", "query": "ahead", "lat": 40, "lon": -40, "cogDeg": 270, "maxNm": 480 },
     { "name": "whereAmI/off-ostend", "query": "whereAmI", "lat": 51.25, "lon": 2.85 },
     { "name": "whereAmI/haro-strait", "query": "whereAmI", "lat": 48.6, "lon": -123.2 },
     { "name": "whereAmI/taveuni", "query": "whereAmI", "lat": -16.8, "lon": 179.99 },

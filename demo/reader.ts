@@ -3,6 +3,7 @@ import { HttpReader } from "flatgeobuf/lib/mjs/http-reader.js";
 import { SeekableZstdReader } from "flatgeobuf/lib/mjs/seekable-zstd.js";
 import { createQueries, type Rect, type Zone } from "../src/queries.ts";
 import { tiles, wrapped } from "../src/tiles.ts";
+import type { AheadOptions } from "../src/ahead.ts";
 
 declare const TILE_VERSION: string;
 export const version = TILE_VERSION;
@@ -42,12 +43,12 @@ function wasmUrl() {
     });
   return wasm;
 }
-async function* read(tile: string, rect: Rect, kind?: string) {
+async function* read(tile: string, rect: Rect, kinds?: readonly string[]) {
   const codecUrl = await wasmUrl();
   const source = await SeekableZstdReader.open(new URL(`${tile}.fgb.zst`, base).href, false, {}, codecUrl);
   const reader = await HttpReader.openSource(source);
   for await (const { id, feature } of reader.selectBbox(rect)) {
-    const decoded = fromFeature(id, feature, reader.header, kind);
+    const decoded = fromFeature(id, feature, reader.header, kinds);
     if (decoded) yield decoded;
   }
 }
@@ -72,8 +73,11 @@ export async function distanceTo(lat: number, lon: number, iso: string) {
 export async function distanceToLand(lat: number, lon: number) {
   return (await reader()).distanceToLand(lat, lon);
 }
+export async function ahead(lat: number, lon: number, cogDeg: number, options?: AheadOptions) {
+  return (await reader()).ahead(lat, lon, cogDeg, options);
+}
 
-/** Nearby zone pieces for the map; the four answers use the shared query engine. */
+/** Nearby zone pieces for the map; the answers use the shared query engine. */
 export async function zoneFeatures(rect: Rect, ids: Set<number>) {
   const data = await metadata();
   const found = [];

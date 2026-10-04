@@ -20,7 +20,7 @@ jobs:
       # The vitest suite needs dist/, which means downloading every layer from
       # VLIZ; it runs locally. See CONTRIBUTING.md.
       - run: npx tsc -p .
-      - run: npx vitest run test/regulations.test.ts test/package.test.ts
+      - run: npx vitest run test/regulations.test.ts test/package.test.ts test/ahead.test.ts test/feature.test.ts
       - run: npm run demo:build
       # A tileVersion bump precedes its release; latest metadata is only an offline packaging fixture.
       - name: Package metadata fixture

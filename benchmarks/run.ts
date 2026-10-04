@@ -42,7 +42,7 @@ assert.ok(
 );
 assert.ok(Number.isSafeInteger(suite.samples) && suite.samples >= 7, "Fewer than seven samples");
 const skip = values.skip === undefined ? null : new RegExp(values.skip);
-const selected: { name: string; lat: number; lon: number }[] = suite.cases.filter(
+const selected: { name: string; lat: number; lon: number; query: string }[] = suite.cases.filter(
   (spec: { name: string }) => !skip?.test(spec.name),
 );
 assert.ok(selected.length > 0, "Every workload was skipped");
@@ -111,6 +111,7 @@ try {
   symlinkSync(join(root, "node_modules"), join(baseline, "node_modules"));
 
   const modes = (values.mode === "both" ? ["offline", "range"] : [values.mode]) as Mode[];
+  const baseApi = await import(pathToFileURL(join(baseline, "src/index.ts")).href);
   if (modes.includes("range") && !existsSync(join(baseline, "src", "queries.ts"))) {
     modes.splice(modes.indexOf("range"), 1);
     summary.push("Range mode skipped: the base has no src/queries.ts to read over HTTP ranges.", "");
@@ -128,6 +129,14 @@ try {
     base: { harness, environment, revision: baseRevision, dirty: false, recordedAt: "", settings: suite, results: [] },
     candidate: { harness, environment, revision, dirty, recordedAt: "", settings: suite, results: [] },
   };
+  reports.base.unavailable = selected
+    .filter((spec) => typeof baseApi[spec.query] !== "function")
+    .flatMap((spec) => modes.map((mode) => ({ name: spec.name, mode })));
+  if (reports.base.unavailable.length)
+    summary.push(
+      `New workloads have no base API and are measured only on the candidate: ${reports.base.unavailable.map((s) => `${s.mode} ${s.name}`).join(", ")}.`,
+      "",
+    );
   const sources = { base: baseline, candidate: root };
   // Keep paired measurements close and alternate which revision runs first,
   // so drift on the machine lands on both sides.
@@ -138,6 +147,7 @@ try {
       for (let round = 0; round < suite.samples; round++) {
         const order = (round % 2 === 0 ? ["base", "candidate"] : ["candidate", "base"]) as ("base" | "candidate")[];
         for (const label of order) {
+          if (label === "base" && reports.base.unavailable!.some((s) => s.mode === mode && s.name === name)) continue;
           const fixed = previous[label] ? [String(previous[label].iterations)] : [];
           const sample: Sample = JSON.parse(
             execFileSync(process.execPath, [join(bench, "measure.ts"), sources[label], mode, name, ...fixed], {

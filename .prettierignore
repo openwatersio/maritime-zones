@@ -3,3 +3,4 @@ dist/
 node_modules/
 upstream.lock.json
 .benchmarks/
+.superpowers/

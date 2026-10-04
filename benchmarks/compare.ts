@@ -25,6 +25,8 @@ export interface Report {
   recordedAt: string;
   settings?: unknown;
   results: Sample[];
+  /** Explicitly absent APIs in this revision; other workloads must still be measured. */
+  unavailable?: { name: string; mode: Mode }[];
 }
 
 export function median(values: number[]): number {
@@ -33,7 +35,7 @@ export function median(values: number[]): number {
   return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
-const key = (s: Sample) => `${s.mode} ${s.name}`;
+const key = (s: { mode: Mode; name: string }) => `${s.mode} ${s.name}`;
 const count = (n: unknown) => Number.isSafeInteger(n) && (n as number) >= 0;
 
 export function validate(report: Report): void {
@@ -47,8 +49,11 @@ export function validate(report: Report): void {
       `Missing environment: ${field}`,
     );
   }
-  assert.ok(report.results.length > 0, "Empty benchmark report");
-  assert.equal(new Set(report.results.map(key)).size, report.results.length, "Duplicate workloads");
+  const workloads = [...report.results, ...(report.unavailable ?? [])];
+  assert.ok(workloads.length > 0, "Empty benchmark report");
+  assert.equal(new Set(workloads.map(key)).size, workloads.length, "Duplicate workloads");
+  for (const missing of report.unavailable ?? [])
+    assert.ok(missing.name && ["offline", "range"].includes(missing.mode), "Invalid unavailable workload");
   for (const result of report.results) {
     assert.ok(result.name && Number.isFinite(result.checksum), "Missing name or non-finite checksum");
     assert.ok(result.mode === "offline" || result.mode === "range", `Unknown mode: ${result.mode}`);
@@ -72,7 +77,12 @@ export function compare(base: Report, candidate: Report, threshold = 20): { regr
   for (const field of ["harness", "environment"] as const) {
     assert.deepEqual(candidate[field], base[field], `Incomparable reports: ${field}`);
   }
-  assert.deepEqual(candidate.results.map(key).sort(), base.results.map(key).sort(), "Workload set changed");
+  assert.ok(!candidate.unavailable?.length, "Candidate has unavailable workloads");
+  assert.deepEqual(
+    candidate.results.map(key).sort(),
+    [...base.results, ...(base.unavailable ?? [])].map(key).sort(),
+    "Workload set changed",
+  );
   const limit = 1 + threshold / 100;
   const rows = [
     "## Query performance",
@@ -84,7 +94,13 @@ export function compare(base: Report, candidate: Report, threshold = 20): { regr
   ];
   let regressed = false;
   for (const current of candidate.results) {
-    const previous = base.results.find((r) => key(r) === key(current))!;
+    const previous = base.results.find((r) => key(r) === key(current));
+    if (!previous) {
+      rows.push(
+        `| ${current.name} | ${current.mode} | — | ${median(current.samplesMs).toFixed(2)} | — | ${current.requests ?? ""} | ${current.bytes === undefined ? "" : mb(current.bytes)} | new |`,
+      );
+      continue;
+    }
     assert.equal(current.checksum, previous.checksum, `Workload output changed: ${key(current)}`);
     const before = median(previous.samplesMs);
     const after = median(current.samplesMs);

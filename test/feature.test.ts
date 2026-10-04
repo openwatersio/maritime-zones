@@ -5,6 +5,41 @@ import { expect, test, vi } from "vitest";
 import { fromFeature } from "../src/feature.ts";
 import { createQueries, type Zone } from "../src/queries.ts";
 
+test("course scans share a boundary and land read without allocating zone coordinates", async () => {
+  const bytes = serialize({
+    type: "FeatureCollection",
+    features: ["zone", "boundary", "land"].map((kind) => ({
+      type: "Feature" as const,
+      properties: { kind, zone: 0 },
+      geometry: {
+        type: "LineString" as const,
+        coordinates: [
+          [1, 1],
+          [2, 1],
+        ],
+      },
+    })),
+  });
+  const kinds: string[] = [];
+  for await (const _ of deserialize(bytes, {
+    fromFeature(id, raw, header) {
+      const properties = eagerFeature(id, raw, header).properties!;
+      const geometry = vi.spyOn(raw, "geometry");
+      const result = fromFeature(id, raw, header, ["boundary", "land"]);
+      if (properties.kind === "zone") {
+        expect(result).toBeUndefined();
+        expect(geometry).not.toHaveBeenCalled();
+      } else {
+        expect(result!.geometry.xy.buffer).toBe(bytes.buffer);
+        kinds.push(result!.properties.kind);
+      }
+      return result ?? {};
+    },
+  })) {
+  }
+  expect(kinds.sort()).toEqual(["boundary", "land"]);
+});
+
 test("land queries decode only land geometry and preserve the GeoJSON result", async () => {
   const bytes = serialize({
     type: "FeatureCollection",
@@ -21,14 +56,14 @@ test("land queries decode only land geometry and preserve the GeoJSON result", a
     })),
   });
   const queries = createQueries(
-    async function* (_tile, _rect, kind) {
-      expect(kind).toBe("land");
+    async function* (_tile, _rect, kinds) {
+      expect(kinds).toEqual(["land"]);
       for await (const feature of deserialize(bytes, {
         fromFeature(id, raw, header) {
           const expected = eagerFeature(id, raw, header);
           const read = vi.spyOn(raw, "geometry");
-          const decoded = fromFeature(id, raw, header, kind);
-          if (expected.properties!.kind === kind) {
+          const decoded = fromFeature(id, raw, header, kinds);
+          if (kinds.includes(expected.properties!.kind)) {
             expect(decoded!.geometry).toMatchObject({ xy: new Float64Array([1, 1, 2, 1]), ends: null });
             expect(decoded!.geometry.xy.buffer).toBe(bytes.buffer);
             expect(read).toHaveBeenCalledTimes(1);
@@ -80,10 +115,10 @@ test("zone queries read ring ends without filling polygon holes", async () => {
   });
   const zone = { layer: "12nm", iso_ter: "BEL" } as Zone;
   const queries = createQueries(
-    async function* (_tile, _rect, kind) {
+    async function* (_tile, _rect, kinds) {
       for await (const f of deserialize(bytes, {
         fromFeature(id, raw, header) {
-          const decoded = fromFeature(id, raw, header, kind)!;
+          const decoded = fromFeature(id, raw, header, kinds)!;
           expect(decoded.geometry.xy.buffer).toBe(bytes.buffer);
           expect(decoded.geometry.ends).toEqual(new Uint32Array([5, 10]));
           return decoded;

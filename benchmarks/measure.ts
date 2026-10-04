@@ -52,11 +52,12 @@ if (mode === "offline") {
     return response;
   };
   api = createQueries(
-    async function* (tile: string, rect: any, kind?: string) {
+    // Forwarded untouched: older revisions pass a single kind, newer ones a list.
+    async function* (tile: string, rect: any, kinds: unknown) {
       const source = await SeekableZstdReader.open(`${base}${tile}.fgb.zst`);
       const reader = await HttpReader.openSource(source);
       for await (const { id, feature } of reader.selectBbox(rect)) {
-        const decoded = fromFeature(id, feature, reader.header, kind);
+        const decoded = fromFeature(id, feature, reader.header, kinds);
         if (decoded) yield decoded;
       }
     },
@@ -65,16 +66,24 @@ if (mode === "offline") {
   );
 }
 
-const { lat, lon, iso } = spec;
+const { lat, lon, iso, cogDeg, maxNm, layers } = spec;
 const work: () => Promise<any> = {
   whereAmI: () => api.whereAmI(lat, lon),
   nearestTerritory: () => api.nearestTerritory(lat, lon),
   distanceTo: () => api.distanceTo(lat, lon, iso),
   distanceToLand: () => api.distanceToLand(lat, lon),
+  ahead: () => api.ahead(lat, lon, cogDeg, { maxNm, layers }),
 }[spec.query as string]!;
 assert.ok(work, `Unknown query: ${spec.query}`);
 // Consumes each timed answer without hashing it inside the measurement.
-const sink = (answer: any) => (Array.isArray(answer) ? answer.length : answer ? answer.distanceNm : -1);
+const sink = (answer: any) =>
+  Array.isArray(answer)
+    ? answer.length
+    : answer && "crossings" in answer
+      ? answer.crossings.length
+      : answer
+        ? answer.distanceNm
+        : -1;
 
 // The first call also pays for loading tiles; its requests and bytes are what one browser query costs.
 const first = await work();

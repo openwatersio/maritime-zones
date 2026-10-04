@@ -1,5 +1,6 @@
 import { box, tiles, wrapped } from "./tiles.ts";
 import type { QueryGeometry } from "./feature.ts";
+import { createAhead, EARTH_NM, LAYERS, RAD, SOVEREIGN, wrap } from "./ahead.ts";
 
 export type Layer = "internal" | "archipelagic" | "12nm" | "24nm" | "eez" | "high_seas";
 
@@ -36,17 +37,11 @@ export interface Options {
 
 export type Rect = { minX: number; minY: number; maxX: number; maxY: number };
 
-/** The same query math for offline files and browser range reads. */
-export function createQueries(
-  read: (tile: string, rect: Rect, kind: string) => AsyncIterable<unknown>,
-  listed: () => Record<string, unknown>,
-  zones: () => Zone[],
-) {
-  const SOVEREIGN: Layer[] = ["internal", "archipelagic", "12nm"];
+/** Reads the features of the listed kinds whose bbox meets the rect from one tile. */
+export type Read = (tile: string, rect: Rect, kinds: readonly string[]) => AsyncIterable<unknown>;
 
-  const ORDER: Layer[] = ["internal", "archipelagic", "12nm", "24nm", "eez", "high_seas"];
-  const EARTH_NM = 3440.065;
-  const RAD = Math.PI / 180;
+/** The same query math for offline files and browser range reads. */
+export function createQueries(read: Read, listed: () => Record<string, unknown>, zones: () => Zone[]) {
   /** Past this search radius (degrees of latitude, ~480 NM) nothing counts as near. */
   const MAX_RADIUS = 8;
 
@@ -66,7 +61,7 @@ export function createQueries(
       const rect = { minX: box[0], minY: box[1], maxX: box[2], maxY: box[3] };
       for (const tile of tiles(box)) {
         if (!listed()[tile]) continue;
-        for await (const f of read(tile, rect, kind)) {
+        for await (const f of read(tile, rect, [kind])) {
           const feature = f as unknown as {
             properties: { kind: Kind; zone?: number };
             geometry: QueryGeometry;
@@ -104,7 +99,7 @@ export function createQueries(
     for (const f of await query("zone", lon - e, lat - e, lon + e, lat + e)) {
       if (contains(f.geometry, lon, lat)) hits.add(f.zone!);
     }
-    return [...hits].map((i) => zones()[i]!).sort((a, b) => ORDER.indexOf(a.layer) - ORDER.indexOf(b.layer));
+    return [...hits].map((i) => zones()[i]!).sort((a, b) => LAYERS.indexOf(a.layer) - LAYERS.indexOf(b.layer));
   }
 
   function haversine([lat1, lon1]: Point, [lat2, lon2]: Point): number {
@@ -121,8 +116,6 @@ export function createQueries(
       Math.cos(lat1 * RAD) * Math.sin(lat2 * RAD) - Math.sin(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos(dLon);
     return (((Math.atan2(y, x) / RAD) % 360) + 360) % 360;
   }
-
-  const wrap = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
 
   /**
    * Closest point on a line to [lat, lon]. The closest point is found in a local
@@ -201,5 +194,5 @@ export function createQueries(
     return nearest("land", lat, lon, () => true);
   }
 
-  return { whereAmI, nearestTerritory, distanceTo, distanceToLand };
+  return { whereAmI, nearestTerritory, distanceTo, distanceToLand, ahead: createAhead(read, listed, zones, whereAmI) };
 }
