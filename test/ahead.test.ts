@@ -1,8 +1,6 @@
-import { test } from "vitest";
-import assert from "node:assert/strict";
+import { expect, test } from "vitest";
 import { createQueries } from "../src/queries.ts";
 import type { Zone } from "../src/queries.ts";
-import { expect } from "vitest";
 
 type P = [number, number];
 const rect = (x0: number, x1: number, y0 = -1, y1 = 1): P[] => [
@@ -63,51 +61,49 @@ test("shared border groups exit A and entry B", async () => {
     { zone: zone("A"), rings: [rect(0, 1)] },
     { zone: zone("B"), rings: [rect(1, 2)] },
   ])(0, 0.5, 90, { maxNm: 50 });
-  assert.deepEqual(summary(result), [[["A"], ["B"]]]);
-  assert.ok(Math.abs(result.crossings[0]!.distanceNm - 30.02023) < 0.001);
+  expect(summary(result)).toEqual([[["A"], ["B"]]]);
+  expect(Math.abs(result.crossings[0]!.distanceNm - 30.02023)).toBeLessThan(0.001);
 });
 test("outside -> A -> outside", async () => {
-  assert.deepEqual(summary(await fixture([{ zone: zone("A"), rings: [rect(1, 2)] }])(0, 0, 90, { maxNm: 150 })), [
+  expect(summary(await fixture([{ zone: zone("A"), rings: [rect(1, 2)] }])(0, 0, 90, { maxNm: 150 }))).toEqual([
     [[], ["A"]],
     [["A"], []],
   ]);
 });
 test("same territory layer transition suppressed", async () => {
-  assert.deepEqual(
+  expect(
     summary(
       await fixture([
         { zone: zone("A", "internal"), rings: [rect(0, 1)] },
         { zone: zone("A"), rings: [rect(1, 3)] },
       ])(0, 0.5, 90, { maxNm: 120 }),
     ),
-    [],
-  );
+  ).toEqual([]);
 });
 test("overlap preserves A while entering B", async () => {
-  assert.deepEqual(
+  expect(
     summary(
       await fixture([
         { zone: zone("A"), rings: [rect(0, 3)] },
         { zone: zone("B"), rings: [rect(1, 2)] },
       ])(0, 0.5, 90, { maxNm: 100 }),
     ),
-    [
-      [[], ["B"]],
-      [["B"], []],
-    ],
-  );
+  ).toEqual([
+    [[], ["B"]],
+    [["B"], []],
+  ]);
 });
 test("joint regime parties participate in membership", async () => {
   const r = await fixture([
     { zone: zone("A"), rings: [rect(0, 1)] },
     { zone: zone("A", "12nm", { iso_ter2: "B" }), rings: [rect(1, 2)] },
   ])(0, 0.5, 90, { maxNm: 50 });
-  assert.equal(r.crossings.length, 1);
-  assert.equal(r.crossings[0]!.kind, "water");
-  assert.deepEqual(summary(r), [[[], ["A"]]]);
+  expect(r.crossings.length).toBe(1);
+  expect(r.crossings[0]!.kind).toBe("water");
+  expect(summary(r)).toEqual([[[], ["A"]]]);
 });
 test("vertex touch emits no water transition", async () => {
-  assert.deepEqual(
+  expect(
     summary(
       await fixture([
         {
@@ -123,55 +119,62 @@ test("vertex touch emits no water transition", async () => {
         },
       ])(0, 0, 90, { maxNm: 150 }),
     ),
-    [],
-  );
+  ).toEqual([]);
 });
 test("island stops at coastline rather than exiting sovereign water", async () => {
   const hole = rect(1, 2, -0.5, 0.5);
-  assert.deepEqual(
+  expect(
     summary(await fixture([{ zone: zone("A"), rings: [rect(0, 4), hole] }], [hole])(0, 0.5, 90, { maxNm: 180 })),
-    ["coast"],
-  );
+  ).toEqual(["coast"]);
+});
+test("a start on land reports it and scans past the coastline it leaves", async () => {
+  const q = fixture([{ zone: zone("A"), rings: [rect(0.5, 1.5)] }], [rect(-1, 0.5), rect(1.5, 3)]);
+  const r = await q(0, 0, 90, { maxNm: 120 });
+  expect(r.onLand).toBe(true);
+  expect(summary(r)).toEqual([[[], ["A"]], "coast"]);
+  expect(r.crossings.at(-1)!.point[1]).toBeCloseTo(1.5, 8);
+  expect((await q(0, -0.5, 90, { maxNm: 20 })).crossings).toEqual([]);
+  expect((await q(0, 1, 90, { maxNm: 120 })).onLand).toBe(false);
 });
 test("across antimeridian", async () => {
   const r = await fixture([{ zone: zone("FJI"), rings: [rect(-179.8, -179)] }])(0, 179.8, 90, { maxNm: 100 });
-  assert.deepEqual(summary(r), [
+  expect(summary(r)).toEqual([
     [[], ["FJI"]],
     [["FJI"], []],
   ]);
-  assert.ok(Math.abs(r.crossings[0]!.distanceNm - 24.01618) < 0.001);
-  assert.ok(Math.abs(r.crossings[0]!.point[1] + 179.8) < 1e-8);
+  expect(Math.abs(r.crossings[0]!.distanceNm - 24.01618)).toBeLessThan(0.001);
+  expect(Math.abs(r.crossings[0]!.point[1] + 179.8)).toBeLessThan(1e-8);
 });
 test("empty horizon", async () => {
-  assert.deepEqual(summary(await fixture([])(0, 0, 90, { maxNm: 480 })), []);
+  expect(summary(await fixture([])(0, 0, 90, { maxNm: 480 }))).toEqual([]);
 });
 test("selected EEZ layer", async () => {
   const q = fixture([{ zone: zone("A", "eez"), rings: [rect(1, 2)] }]);
-  assert.deepEqual(summary(await q(0, 0, 90, { maxNm: 80 })), []);
-  assert.deepEqual(summary(await q(0, 0, 90, { maxNm: 80, layers: ["eez"] })), [[[], ["A"]]]);
+  expect(summary(await q(0, 0, 90, { maxNm: 80 }))).toEqual([]);
+  expect(summary(await q(0, 0, 90, { maxNm: 80, layers: ["eez"] }))).toEqual([[[], ["A"]]]);
 });
 test("high latitude eastbound rhumb distance", async () => {
   const r = await fixture([{ zone: zone("A"), rings: [rect(1, 2, 79, 81)] }])(80, 0, 90, { maxNm: 20 });
-  assert.ok(
-    Math.abs(r.crossings[0]!.distanceNm - ((3440.065 * Math.PI) / 180) * Math.cos((80 * Math.PI) / 180)) < 1e-6,
-  );
+  expect(
+    Math.abs(r.crossings[0]!.distanceNm - ((3440.065 * Math.PI) / 180) * Math.cos((80 * Math.PI) / 180)),
+  ).toBeLessThan(1e-6);
 });
 test("diagonal rhumb uses Mercator intersection", async () => {
   const r = await fixture([{ zone: zone("A"), rings: [rect(1, 2, 0, 3)] }])(0, 0, 45, { maxNm: 120 });
   const phi = 2 * Math.atan(Math.exp(Math.PI / 180)) - Math.PI / 2;
-  assert.ok(Math.abs(r.crossings[0]!.distanceNm - (phi * 3440.065) / Math.cos(Math.PI / 4)) < 1e-6);
+  expect(Math.abs(r.crossings[0]!.distanceNm - (phi * 3440.065) / Math.cos(Math.PI / 4))).toBeLessThan(1e-6);
 });
 test("start on shared boundary emits zero-distance transition", async () => {
   const r = await fixture([
     { zone: zone("A"), rings: [rect(0, 1)] },
     { zone: zone("B"), rings: [rect(1, 2)] },
   ])(0, 1, 90, { maxNm: 50 });
-  assert.deepEqual(summary(r), [[["A"], ["B"]]]);
-  assert.ok(r.crossings[0]!.distanceNm < 1e-6);
+  expect(summary(r)).toEqual([[["A"], ["B"]]]);
+  expect(r.crossings[0]!.distanceNm).toBeLessThan(1e-6);
 });
 test("pole and invalid horizon rejected", async () => {
-  await assert.rejects(fixture([])(89, 0, 0, { maxNm: 100 }), /pole/);
-  await assert.rejects(fixture([])(0, 0, 0, { maxNm: 0 }), /maxNm/);
+  await expect(fixture([])(89, 0, 0, { maxNm: 100 })).rejects.toThrow(/pole/);
+  await expect(fixture([])(0, 0, 0, { maxNm: 0 })).rejects.toThrow(/maxNm/);
 });
 test("one straight geographic segment can cross the rhumb twice", async () => {
   const merc = (p: number) => Math.log(Math.tan(Math.PI / 4 + (p * Math.PI) / 360));
@@ -186,8 +189,8 @@ test("one straight geographic segment can cross the rhumb twice", async () => {
   const onLongEdge = r.crossings.filter(
     (c) => Math.abs((c.point[0] - 80.5) / 4.5 - (c.point[1] - x(80.5)) / (x(85) - x(80.5))) < 1e-8,
   );
-  assert.equal(onLongEdge.length, 2);
-  assert.deepEqual(summary(r), [
+  expect(onLongEdge.length).toBe(2);
+  expect(summary(r)).toEqual([
     [[], ["A"]],
     [["A"], []],
     [[], ["A"]],
@@ -200,7 +203,7 @@ test("one metre grouping merges a tiny data gap", async () => {
     { zone: zone("B"), rings: [rect(1 + 0.000005, 2)] },
   ]);
 
-  assert.deepEqual(summary(await q(0, 0.5, 90, { maxNm: 50 })), [[["A"], ["B"]]]);
+  expect(summary(await q(0, 0.5, 90, { maxNm: 50 }))).toEqual([[["A"], ["B"]]]);
 });
 test("grouping works across thirty-mile scan steps", async () => {
   const border = (30 - 0.0001) / ((3440.065 * Math.PI) / 180);
@@ -208,10 +211,7 @@ test("grouping works across thirty-mile scan steps", async () => {
     { zone: zone("A"), rings: [rect(-1, border)] },
     { zone: zone("B"), rings: [rect(border + 0.000005, 2)] },
   ]);
-  assert.deepEqual(summary(await q(0, 0, 90, { maxNm: 50 })), [[["A"], ["B"]]]);
-});
-test("the shared query factory exposes ahead", () => {
-  expect(typeof fixture([])).toBe("function");
+  expect(summary(await q(0, 0, 90, { maxNm: 50 }))).toEqual([[["A"], ["B"]]]);
 });
 test("westbound antimeridian crossing uses the same along-course distance", async () => {
   const r = await fixture([{ zone: zone("A"), rings: [rect(179, 179.8)] }])(0, -179.8, 270, { maxNm: 50 });
@@ -286,7 +286,7 @@ test("near-east and west courses recover distance on a stable axis", async () =>
         ],
       ],
     );
-    for (const delta of [-1e-10, -1e-11, 0, 1e-11, 1e-10]) {
+    for (const delta of [-1e-7, -3e-8, -1e-8, -1e-10, -1e-11, 0, 1e-11, 1e-10, 1e-8, 3e-8, 1e-7]) {
       const r = await q(50, 0, direction + delta, { maxNm: 80 });
       expect(r.crossings).toHaveLength(1);
       expect(r.crossings[0]!.distanceNm).toBeCloseTo(distance, 6);

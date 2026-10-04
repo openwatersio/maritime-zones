@@ -54,6 +54,7 @@ import { ahead } from "@openwaters/maritime-zones";
 await ahead(52.2, 4.2, 225, { maxNm: 120 });
 // {
 //   start: [{ layer: "12nm", iso_ter: "NLD", … }],
+//   onLand: false,
 //   crossings: [
 //     { kind: "water", distanceNm: 56.68, point: [51.53, 3.12],
 //       leaving: [{ iso_ter: "NLD", … }], entering: [{ iso_ter: "BEL", … }] },
@@ -68,7 +69,7 @@ await ahead(52.2, 4.2, 225, { maxNm: 120 });
 
 Candidate boundaries within 1 metre of the earliest candidate are grouped into one crossing, using that candidate's distance. Larger gaps and overlaps stay separate. The coastline event uses the actual coastline-contact distance and ends the result. It includes tangencies, has no country identity, and does not establish entry onto land. Water polygons and the coastline can disagree: one Belgian approach has a roughly 405 m interval between its territorial-water exit and coastline contact.
 
-The starting position must be on water; the query does not validate that precondition. A course exactly along a boundary has no unique crossing. Coordinates and course must be finite, latitude must be strictly between −90° and 90°, and longitude must be between −180° and 180°. A horizon that reaches a pole or spans more than 16 longitude revolutions throws `RangeError`; shorten `maxNm` for extreme polar courses. An empty `crossings` array means no transition or coastline contact was found within the horizon; missing tiles still throw.
+A start in no zone of any layer sets `onLand`: the position is on land, or in a harbour or berth the coastline covers. Leaving land there is not a coastline contact, so the result continues with the waters beyond; only a contact from water ends it. A course exactly along a boundary has no unique crossing. Coordinates and course must be finite, latitude must be strictly between −90° and 90°, and longitude must be between −180° and 180°. A horizon that reaches a pole or spans more than 16 longitude revolutions throws `RangeError`; shorten `maxNm` for extreme polar courses. An empty `crossings` array means no transition or coastline contact was found within the horizon; missing tiles still throw.
 
 The caller calculates ETA with `crossing.distanceNm / sogKn * 60` for positive speed over ground in knots. Speed changes can reuse the crossings for the same starting position, course, and horizon.
 

@@ -38,7 +38,7 @@ describe("ahead", () => {
     expect(result.crossings[0]!.distanceNm).toBeCloseTo(68.223, 2);
   });
   test("the westbound Atlantic horizon contains no sovereign crossings", async () => {
-    expect(await ahead(40, -40, 270)).toEqual({ start: [], crossings: [] });
+    expect(await ahead(40, -40, 270)).toEqual({ start: [], onLand: false, crossings: [] });
   });
 });
 

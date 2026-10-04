@@ -14,18 +14,24 @@ export type Crossing =
 export interface AheadResult {
   /** Selected layers containing the starting point. */
   start: Zone[];
+  /** The start is in no zone of any layer: on land, or in a berth the coastline covers. */
+  onLand: boolean;
   /** Territory transitions in order, ending at the first coastline contact if any. */
   crossings: Crossing[];
 }
 
-const RAD = Math.PI / 180;
-const EARTH_NM = 3440.065;
+export const RAD = Math.PI / 180;
+export const EARTH_NM = 3440.065;
 const GROUP_NM = 1 / 1852;
 const ENDPOINT_NM = 1e-8;
-const SOVEREIGN: Layer[] = ["internal", "archipelagic", "12nm"];
-const LAYERS: Layer[] = ["internal", "archipelagic", "12nm", "24nm", "eez", "high_seas"];
-const wrap = (x: number) => ((((x + 180) % 360) + 360) % 360) - 180;
+export const SOVEREIGN: Layer[] = ["internal", "archipelagic", "12nm"];
+/** Every layer, innermost first. */
+export const LAYERS: Layer[] = ["internal", "archipelagic", "12nm", "24nm", "eez", "high_seas"];
+export const wrap = (x: number) => ((((x + 180) % 360) + 360) % 360) - 180;
 const mercator = (latitude: number) => Math.log(Math.tan(Math.PI / 4 + latitude / 2));
+/** Δφ/Δψ of a rhumb leg; a tiny Δφ takes the cosine limit, where the Mercator difference cancels. */
+const stretch = (from: number, to: number) =>
+  Math.abs(to - from) < 1e-6 ? Math.cos((from + to) / 2) : (to - from) / (mercator(to) - mercator(from));
 const parties = (z: Zone): string[] => {
   const codes = [z.iso_ter ?? z.iso_sov, z.iso_ter2 ?? z.iso_sov2, z.iso_ter3 ?? z.iso_sov3].filter(
     (iso): iso is string => !!iso,
@@ -62,20 +68,24 @@ export function createAhead(
 
     function position(distanceNm: number): [number, number] {
       const latitude = originLat + (distanceNm / EARTH_NM) * north;
-      const deltaY = mercator(latitude) - originY;
-      const q = Math.abs(deltaY) > 1e-12 ? (latitude - originLat) / deltaY : Math.cos(originLat);
-      return [latitude / RAD, (originLon + ((distanceNm / EARTH_NM) * east) / q) / RAD];
+      return [latitude / RAD, (originLon + ((distanceNm / EARTH_NM) * east) / stretch(originLat, latitude)) / RAD];
     }
     if (Math.abs(position(maxNm)[1] - lon) > 16 * 360)
       throw new RangeError("course exceeds 16 longitude revolutions; shorten maxNm");
     const backPad = north
       ? Math.min(0.005, maxNm, ((Math.PI / 2 - Math.abs(originLat)) * EARTH_NM) / (2 * Math.abs(north)))
       : Math.min(0.005, maxNm);
-    const state = async (distanceNm: number) => {
+    const here = (distanceNm: number) => {
       const [a, b] = position(distanceNm);
-      return (await whereAmI(a, wrap(b))).filter((z) => layers.includes(z.layer));
+      return whereAmI(a, wrap(b));
     };
-    const result: AheadResult = { start: await state(0), crossings: [] };
+    const state = async (distanceNm: number) => (await here(distanceNm)).filter((z) => layers.includes(z.layer));
+    const origin = await here(0);
+    const result: AheadResult = {
+      start: origin.filter((z) => layers.includes(z.layer)),
+      onLand: !origin.length,
+      crossings: [],
+    };
 
     function intersect(ax: number, ay: number, bx: number, by: number, nearLon: number): number[] {
       // A leg's longitude branch keeps repeated polar revolutions and dateline crossings distinct.
@@ -97,12 +107,10 @@ export function createAhead(
       const distances: number[] = [];
       const add = (t: number) => {
         const latitude = y + t * vy;
-        const deltaY = mercator(latitude) - originY;
-        const q = Math.abs(deltaY) > 1e-12 ? (latitude - originLat) / deltaY : Math.cos(originLat);
         distances.push(
           Math.abs(north) >= Math.abs(east)
             ? ((latitude - originLat) * EARTH_NM) / north
-            : ((x + t * vx - originLon) * q * EARTH_NM) / east,
+            : ((x + t * vx - originLon) * stretch(originLat, latitude) * EARTH_NM) / east,
         );
       };
       for (let i = 1; i < stops.length; i++) {
@@ -167,8 +175,16 @@ export function createAhead(
                     : Math.abs(rawDistance - maxNm) <= ENDPOINT_NM
                       ? maxNm
                       : rawDistance;
-                if (distanceNm >= lo - 1e-7 && distanceNm <= hi + 1e-7 && distanceNm >= -backPad && distanceNm <= maxNm)
-                  candidates.push({ distanceNm, coast });
+                if (distanceNm < lo - 1e-7 || distanceNm > hi + 1e-7 || distanceNm < -backPad || distanceNm > maxNm)
+                  continue;
+                // Leaving land is no contact; zones mark the water side, so only a start in none needs the check.
+                const exit =
+                  coast &&
+                  result.onLand &&
+                  distanceNm >= 0 &&
+                  !(await here(distanceNm - GROUP_NM)).length &&
+                  (await here(distanceNm + GROUP_NM)).length > 0;
+                candidates.push({ distanceNm, coast: coast && !exit });
               }
             }
           }
