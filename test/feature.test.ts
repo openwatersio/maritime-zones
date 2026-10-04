@@ -3,7 +3,7 @@ import { fromFeature as eagerFeature } from "flatgeobuf/lib/mjs/geojson/feature.
 import { deserialize } from "flatgeobuf/lib/mjs/generic.js";
 import { expect, test, vi } from "vitest";
 import { fromFeature } from "../src/feature.ts";
-import { createQueries } from "../src/queries.ts";
+import { createQueries, type Zone } from "../src/queries.ts";
 
 test("land queries decode only land geometry and preserve the GeoJSON result", async () => {
   const bytes = serialize({
@@ -29,7 +29,8 @@ test("land queries decode only land geometry and preserve the GeoJSON result", a
           const read = vi.spyOn(raw, "geometry");
           const decoded = fromFeature(id, raw, header, kind);
           if (expected.properties!.kind === kind) {
-            expect(decoded).toEqual(expected);
+            expect(decoded!.geometry).toMatchObject({ xy: new Float64Array([1, 1, 2, 1]), ends: null });
+            expect(decoded!.geometry.xy.buffer).toBe(bytes.buffer);
             expect(read).toHaveBeenCalledTimes(1);
           } else {
             expect(decoded).toBeUndefined();
@@ -46,4 +47,54 @@ test("land queries decode only land geometry and preserve the GeoJSON result", a
   );
   const hit = await queries.distanceToLand(1.01, 1.5);
   expect(hit?.distanceNm).toBeCloseTo(0.6004, 2);
+});
+
+test("zone queries read ring ends without filling polygon holes", async () => {
+  const bytes = serialize({
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        properties: { kind: "zone", zone: 0 },
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [0, 0],
+              [4, 0],
+              [4, 4],
+              [0, 4],
+              [0, 0],
+            ],
+            [
+              [1, 1],
+              [3, 1],
+              [3, 3],
+              [1, 3],
+              [1, 1],
+            ],
+          ],
+        },
+      },
+    ],
+  });
+  const zone = { layer: "12nm", iso_ter: "BEL" } as Zone;
+  const queries = createQueries(
+    async function* (_tile, _rect, kind) {
+      for await (const f of deserialize(bytes, {
+        fromFeature(id, raw, header) {
+          const decoded = fromFeature(id, raw, header, kind)!;
+          expect(decoded.geometry.xy.buffer).toBe(bytes.buffer);
+          expect(decoded.geometry.ends).toEqual(new Uint32Array([5, 10]));
+          return decoded;
+        },
+      }))
+        yield f;
+    },
+    () => ({ n0e0: {} }),
+    () => [zone],
+  );
+  expect(await queries.whereAmI(0.5, 0.5)).toEqual([zone]);
+  expect(await queries.whereAmI(2, 2)).toEqual([]);
+  expect(await queries.whereAmI(5, 5)).toEqual([]);
 });

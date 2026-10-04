@@ -1,4 +1,5 @@
 import { box, tiles, wrapped } from "./tiles.ts";
+import type { QueryGeometry } from "./feature.ts";
 
 export type Layer = "internal" | "archipelagic" | "12nm" | "24nm" | "eez" | "high_seas";
 
@@ -52,7 +53,7 @@ export function createQueries(
   type Point = [number, number];
 
   type Kind = "zone" | "boundary" | "land";
-  type Found = { zone: number | undefined; coordinates: any };
+  type Found = { zone: number | undefined; geometry: QueryGeometry };
 
   /**
    * Features of one kind whose bbox meets the box, across every tile under it.
@@ -68,10 +69,10 @@ export function createQueries(
         for await (const f of read(tile, rect, kind)) {
           const feature = f as unknown as {
             properties: { kind: Kind; zone?: number };
-            geometry: { coordinates: any };
+            geometry: QueryGeometry;
           };
           if (feature.properties.kind === kind)
-            found.push({ zone: feature.properties.zone, coordinates: feature.geometry.coordinates });
+            found.push({ zone: feature.properties.zone, geometry: feature.geometry });
         }
       }
     }
@@ -79,14 +80,19 @@ export function createQueries(
   }
 
   /** Even–odd ray test over all rings, so holes subtract. */
-  function contains(rings: Point[][], [x, y]: Point): boolean {
+  function contains({ xy, ends }: QueryGeometry, x: number, y: number): boolean {
     let inside = false;
-    for (const ring of rings) {
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const [xi, yi] = ring[i]!;
-        const [xj, yj] = ring[j]!;
+    let start = 0;
+    for (let ring = 0; ring < (ends?.length || 1); ring++) {
+      const end = ends?.length ? ends[ring]! * 2 : xy.length;
+      for (let i = start, j = end - 2; i < end; j = i, i += 2) {
+        const xi = xy[i]!,
+          yi = xy[i + 1]!;
+        const xj = xy[j]!,
+          yj = xy[j + 1]!;
         if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
       }
+      start = end;
     }
     return inside;
   }
@@ -96,7 +102,7 @@ export function createQueries(
     const e = 1e-7;
     const hits = new Set<number>();
     for (const f of await query("zone", lon - e, lat - e, lon + e, lat + e)) {
-      if (contains(f.coordinates, [lon, lat])) hits.add(f.zone!);
+      if (contains(f.geometry, lon, lat)) hits.add(f.zone!);
     }
     return [...hits].map((i) => zones()[i]!).sort((a, b) => ORDER.indexOf(a.layer) - ORDER.indexOf(b.layer));
   }
@@ -123,15 +129,15 @@ export function createQueries(
    * equirectangular projection and measured with haversine.
    * ponytail: projection error grows with distance; fine inside MAX_RADIUS.
    */
-  function closest(line: Point[], lat: number, lon: number): [number, Point] {
+  function closest({ xy }: QueryGeometry, lat: number, lon: number): [number, Point] {
     const k = Math.cos(lat * RAD);
     let best: [number, Point] = [Infinity, [lat, lon]];
     let bestPlanar = Infinity;
-    for (let i = 1; i < line.length; i++) {
-      const ax = wrap(line[i - 1]![0] - lon) * k,
-        ay = line[i - 1]![1] - lat;
-      const bx = wrap(line[i]![0] - lon) * k,
-        by = line[i]![1] - lat;
+    for (let i = 2; i < xy.length; i += 2) {
+      const ax = wrap(xy[i - 2]! - lon) * k,
+        ay = xy[i - 1]! - lat;
+      const bx = wrap(xy[i]! - lon) * k,
+        by = xy[i + 1]! - lat;
       const dx = bx - ax,
         dy = by - ay;
       const t = Math.max(0, Math.min(1, dx || dy ? -(ax * dx + ay * dy) / (dx * dx + dy * dy) : 0));
@@ -154,7 +160,7 @@ export function createQueries(
       for (const f of await query(kind, ...box({ lat, lon, radiusNm: r * 60 }))) {
         const zone = kind === "land" ? null : zones()[f.zone!]!;
         if (!keep(zone)) continue;
-        const [distanceNm, point] = closest(f.coordinates, lat, lon);
+        const [distanceNm, point] = closest(f.geometry, lat, lon);
         if (!best || distanceNm < best.distanceNm)
           best = { distanceNm, bearingDeg: bearing([lat, lon], point), point, zone };
       }

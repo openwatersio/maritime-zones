@@ -86,27 +86,29 @@ Queries never answer from partial data. A tile they can't get throws an error th
 
 ## Performance
 
-Median milliseconds per call on an Apple M1 Ultra (macOS arm64, Node 26.10.0) with the `v0.2.0` tiles, measured on 2026-10-01 with the reader at commit 610c452. [PR #22](https://github.com/openwatersio/maritime-zones/pull/22) records the paired local comparison; the [CI comparison](https://github.com/openwatersio/maritime-zones/actions/runs/36946281902) runs on Ubuntu separately. Offline is the Node API over cached tiles. Range is the browser path: HTTP range reads of the compressed tiles from a local server, with the requests and bytes one call makes. On GitHub Pages each request also pays network latency. Timings depend on the machine and its load; requests and bytes are exact.
+Median milliseconds per call on an Apple M1 Ultra (macOS arm64, Node 26.10.0) with the `v0.2.0` tiles, measured on 2026-10-04 with reader 0.2.2 at commit e16892e. [PR #29](https://github.com/openwatersio/maritime-zones/pull/29) records the paired local comparison; the [CI comparison](https://github.com/openwatersio/maritime-zones/actions/runs/37209741138) runs on Ubuntu separately. Offline is the Node API over cached tiles. Range is the browser path: HTTP range reads of the compressed tiles from a local server, with the requests and bytes one call makes. On GitHub Pages each request also pays network latency. Timings depend on the machine and its load; requests and bytes are exact.
 
 | Workload                            | Offline ms | Range ms | Requests |    MB |
 | ----------------------------------- | ---------: | -------: | -------: | ----: |
-| whereAmI/off-ostend                 |       0.05 |      2.8 |        5 |  0.20 |
-| whereAmI/haro-strait                |       0.11 |      4.2 |        7 |  0.27 |
-| whereAmI/taveuni                    |       0.08 |      4.1 |        8 |  0.22 |
-| nearestTerritory/dover              |       0.21 |      7.6 |       14 |  0.53 |
-| nearestTerritory/haro-strait        |       0.76 |     12.9 |       15 |  0.57 |
-| nearestTerritory/taveuni            |       4.19 |     58.2 |       71 |  2.18 |
-| nearestTerritory/mid-north-atlantic |       0.57 |     30.3 |       98 |  0.69 |
-| nearestTerritory/norwegian-sea      |     166.41 |    782.4 |      343 | 14.75 |
-| nearestTerritory/labrador-sea       |      83.39 |    439.7 |      174 |  7.35 |
-| distanceTo/dover-bel                |       1.33 |     29.2 |       43 |  1.80 |
-| distanceToLand/haro-strait          |       0.62 |      7.8 |        8 |  0.31 |
-| distanceToLand/mid-north-atlantic   |       0.42 |     26.7 |       86 |  0.63 |
-| distanceToLand/norwegian-sea        |      24.02 |    163.1 |       97 |  4.44 |
+| whereAmI/off-ostend                 |       0.04 |     15.4 |        5 |  0.20 |
+| whereAmI/haro-strait                |       0.09 |      7.9 |        7 |  0.27 |
+| whereAmI/taveuni                    |       0.05 |      6.4 |        8 |  0.22 |
+| nearestTerritory/dover              |       0.16 |      8.4 |       14 |  0.53 |
+| nearestTerritory/haro-strait        |       0.68 |     12.7 |       15 |  0.57 |
+| nearestTerritory/taveuni            |       3.77 |     61.8 |       71 |  2.18 |
+| nearestTerritory/mid-north-atlantic |       0.49 |     31.1 |       98 |  0.69 |
+| nearestTerritory/norwegian-sea      |     143.09 |   1044.1 |      343 | 14.75 |
+| nearestTerritory/labrador-sea       |      75.85 |    480.0 |      174 |  7.35 |
+| distanceTo/dover-bel                |       1.14 |     32.2 |       43 |  1.80 |
+| distanceToLand/haro-strait          |       0.83 |      8.1 |        8 |  0.31 |
+| distanceToLand/mid-north-atlantic   |       0.46 |     28.4 |       86 |  0.63 |
+| distanceToLand/norwegian-sea        |      44.75 |    167.7 |       97 |  4.44 |
 
-A query far from any other territory is slow because its search box grows until it holds the answer, up to 480 NM. Readers filter each feature's kind before decoding its geometry or yielding it to the query, so land queries skip zone and boundary coordinates. All feature kinds share a tile index, so filtering saves processing but does not reduce range requests or bytes. CI benchmarks every change to the queries; [CONTRIBUTING](CONTRIBUTING.md#performance) explains how to run the harness.
+A query far from any other territory is slow because its search box grows until it holds the answer, up to 480 NM. Readers filter each feature's kind before yielding it to the query, then measure containment and distance directly from FlatBuffers coordinate views. Queries do not build GeoJSON coordinate arrays; the map decoder still does when drawing zone pieces. All feature kinds share a tile index, so filtering saves processing but does not reduce range requests or bytes. CI benchmarks every change to the queries; [CONTRIBUTING](CONTRIBUTING.md#performance) explains how to run the harness.
 
 The search uses the first matching feature's distance to bound its next pass.
+
+For 500 warmed fixes off IJmuiden calling `whereAmI()`, `distanceToLand()` and `nearestTerritory()`, the built Node reader uses about 123 MB resident on this Mac with Node 26.10.0 and the `v0.2.0` tiles. Tile buffers and JavaScript heap account for only part of resident memory; V8 also reserves space for temporary allocations. The [memory harness](CONTRIBUTING.md#performance) reports resident, heap and buffer memory and can sample garbage collected during queries. Node version, platform and workload affect these figures; no Raspberry Pi was measured.
 
 ## Data
 

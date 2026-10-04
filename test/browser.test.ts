@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { deserialize } from "flatgeobuf/lib/mjs/geojson.js";
+import { HttpReader } from "flatgeobuf/lib/mjs/http-reader.js";
+import { SeekableZstdReader } from "flatgeobuf/lib/mjs/seekable-zstd.js";
+import { fromFeature } from "../src/feature.ts";
 import { expect, it, vi } from "vitest";
 import { serveRanges } from "../benchmarks/range-server.ts";
 import { createQueries, type Zone } from "../src/queries.ts";
@@ -11,7 +13,14 @@ it("answers all four questions from HTTP ranges of the published tile format", a
   const zones: Zone[] = JSON.parse(readFileSync(join(DIST, "zones.json"), "utf8"));
   const server = await serveRanges(join(DIST, "tiles"));
   const reader = createQueries(
-    (tile, rect) => deserialize(`${server.url}${tile}.fgb.zst`, { rect, seekableZstd: true }),
+    async function* (tile, rect, kind) {
+      const source = await SeekableZstdReader.open(`${server.url}${tile}.fgb.zst`);
+      const reader = await HttpReader.openSource(source);
+      for await (const { id, feature } of reader.selectBbox(rect)) {
+        const decoded = fromFeature(id, feature, reader.header, kind);
+        if (decoded) yield decoded;
+      }
+    },
     () => index,
     () => zones,
   );
