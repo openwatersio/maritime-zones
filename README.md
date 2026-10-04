@@ -68,7 +68,7 @@ await ahead(52.2, 4.2, 225, { maxNm: 120 });
 
 Candidate boundaries within 1 metre of the earliest candidate are grouped into one crossing, using that candidate's distance. Larger gaps and overlaps stay separate. The coastline event uses the actual coastline-contact distance and ends the result. It includes tangencies, has no country identity, and does not establish entry onto land. Water polygons and the coastline can disagree: one Belgian approach has a roughly 405 m interval between its territorial-water exit and coastline contact.
 
-The starting position must be on water; the query does not validate that precondition. A course exactly along a boundary has no unique crossing. Coordinates and course must be finite, latitude must be strictly between −90° and 90°, and longitude must be between −180° and 180°. A horizon that reaches a pole throws `RangeError`. An empty `crossings` array means no transition or coastline contact was found within the horizon; missing tiles still throw.
+The starting position must be on water; the query does not validate that precondition. A course exactly along a boundary has no unique crossing. Coordinates and course must be finite, latitude must be strictly between −90° and 90°, and longitude must be between −180° and 180°. A horizon that reaches a pole or spans more than 16 longitude revolutions throws `RangeError`; shorten `maxNm` for extreme polar courses. An empty `crossings` array means no transition or coastline contact was found within the horizon; missing tiles still throw.
 
 The caller calculates ETA with `crossing.distanceNm / sogKn * 60` for positive speed over ground in knots. Speed changes can reuse the crossings for the same starting position, course, and horizon.
 
@@ -133,6 +133,15 @@ Median milliseconds per call on a four-core GitHub Actions runner (AMD EPYC 7763
 | distanceToLand/norwegian-sea        |      54.96 |    347.7 |       97 |  4.44 |
 
 A query far from any other territory is slow because its search box grows until it holds the answer, up to 480 NM. Readers filter each feature's kind before yielding it to the query, then measure containment and distance directly from FlatBuffers coordinate views. Queries do not build GeoJSON coordinate arrays; the map decoder still does when drawing zone pieces. All feature kinds share a tile index, so filtering saves processing but does not reduce range requests or bytes. CI benchmarks every change to the queries; [CONTRIBUTING](CONTRIBUTING.md#performance) explains how to run the harness.
+
+Course-query medians for reader 0.3.0 on an Apple M1 Ultra (macOS arm64, Node 26.10.0), measured on 2026-10-04 against the same `v0.2.0` tiles. These use seven warmed processes per workload and a local HTTP range server; they exclude tile downloads and network latency. The [benchmark harness](benchmarks/run.ts) records raw samples and machine metadata. Existing workloads passed their time, request and byte regression gates against reader 0.2.2.
+
+| Course                                     | Offline ms | Range ms | Requests |   MB |
+| ------------------------------------------ | ---------: | -------: | -------: | ---: |
+| North Sea toward Belgium                   |       0.42 |    22.75 |       39 | 1.68 |
+| Dutch waters through Belgium toward France |       1.90 |    32.94 |       61 | 2.53 |
+| Fiji across the antimeridian               |       0.73 |    25.12 |       51 | 1.48 |
+| Atlantic with no crossing within 480 NM    |       0.36 |    29.45 |      126 | 0.63 |
 
 The search uses the first matching feature's distance to bound its next pass.
 

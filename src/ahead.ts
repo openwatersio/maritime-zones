@@ -21,6 +21,7 @@ export interface AheadResult {
 const RAD = Math.PI / 180;
 const EARTH_NM = 3440.065;
 const GROUP_NM = 1 / 1852;
+const ENDPOINT_NM = 1e-8;
 const SOVEREIGN: Layer[] = ["internal", "archipelagic", "12nm"];
 const LAYERS: Layer[] = ["internal", "archipelagic", "12nm", "24nm", "eez", "high_seas"];
 const wrap = (x: number) => ((((x + 180) % 360) + 360) % 360) - 180;
@@ -65,6 +66,11 @@ export function createAhead(
       const q = Math.abs(deltaY) > 1e-12 ? (latitude - originLat) / deltaY : Math.cos(originLat);
       return [latitude / RAD, (originLon + ((distanceNm / EARTH_NM) * east) / q) / RAD];
     }
+    if (Math.abs(position(maxNm)[1] - lon) > 16 * 360)
+      throw new RangeError("course exceeds 16 longitude revolutions; shorten maxNm");
+    const backPad = north
+      ? Math.min(0.005, maxNm, ((Math.PI / 2 - Math.abs(originLat)) * EARTH_NM) / (2 * Math.abs(north)))
+      : Math.min(0.005, maxNm);
     const state = async (distanceNm: number) => {
       const [a, b] = position(distanceNm);
       return (await whereAmI(a, wrap(b))).filter((z) => layers.includes(z.layer));
@@ -89,12 +95,16 @@ export function createAhead(
       }
       stops.sort((a, b) => a - b);
       const distances: number[] = [];
-      const add = (t: number) =>
+      const add = (t: number) => {
+        const latitude = y + t * vy;
+        const deltaY = mercator(latitude) - originY;
+        const q = Math.abs(deltaY) > 1e-12 ? (latitude - originLat) / deltaY : Math.cos(originLat);
         distances.push(
-          north
-            ? ((y + t * vy - originLat) * EARTH_NM) / north
-            : ((x + t * vx - originLon) * Math.cos(originLat) * EARTH_NM) / east,
+          Math.abs(north) >= Math.abs(east)
+            ? ((latitude - originLat) * EARTH_NM) / north
+            : ((x + t * vx - originLon) * q * EARTH_NM) / east,
         );
+      };
       for (let i = 1; i < stops.length; i++) {
         let lo = stops[i - 1]!,
           hi = stops[i]!,
@@ -119,7 +129,7 @@ export function createAhead(
     }
 
     const candidates: { distanceNm: number; coast: boolean }[] = [];
-    for (let lo = 0; lo < maxNm;) {
+    for (let lo = -backPad; lo < maxNm;) {
       let hi = Math.min(maxNm, lo + 30);
       const a = position(lo);
       let b = position(hi);
@@ -150,28 +160,35 @@ export function createAhead(
               continue;
             const xy = feature.geometry.xy;
             for (let j = 2; j < xy.length; j += 2) {
-              for (const distanceNm of intersect(xy[j - 2]!, xy[j - 1]!, xy[j]!, xy[j + 1]!, (a[1] + b[1]) / 2)) {
-                if (distanceNm >= lo - 1e-7 && distanceNm <= hi + 1e-7 && distanceNm >= -1e-9 && distanceNm <= maxNm)
-                  candidates.push({ distanceNm: Math.max(0, distanceNm), coast });
+              for (const rawDistance of intersect(xy[j - 2]!, xy[j - 1]!, xy[j]!, xy[j + 1]!, (a[1] + b[1]) / 2)) {
+                const distanceNm =
+                  Math.abs(rawDistance) <= ENDPOINT_NM
+                    ? 0
+                    : Math.abs(rawDistance - maxNm) <= ENDPOINT_NM
+                      ? maxNm
+                      : rawDistance;
+                if (distanceNm >= lo - 1e-7 && distanceNm <= hi + 1e-7 && distanceNm >= -backPad && distanceNm <= maxNm)
+                  candidates.push({ distanceNm, coast });
               }
             }
           }
         }
       }
-      if (candidates.some((c) => c.coast)) break;
+      if (candidates.some((c) => c.coast && c.distanceNm >= 0)) break;
       lo = hi;
     }
     candidates.sort((a, b) => a.distanceNm - b.distanceNm);
     const groups: { first: number; last: number; coast: number | null }[] = [];
     for (const c of candidates) {
       const previous = groups.at(-1);
-      if (previous && c.distanceNm - previous.first <= GROUP_NM) {
+      if (previous && previous.first < 0 === c.distanceNm < 0 && c.distanceNm - previous.first <= GROUP_NM) {
         previous.last = c.distanceNm;
         if (c.coast) previous.coast = Math.min(previous.coast ?? Infinity, c.distanceNm);
       } else groups.push({ first: c.distanceNm, last: c.distanceNm, coast: c.coast ? c.distanceNm : null });
     }
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i]!;
+      if (group.first < 0) continue;
       if (group.coast !== null) {
         const [a, b] = position(group.coast);
         result.crossings.push({ kind: "coast", distanceNm: group.coast, point: [a, wrap(b)] });
@@ -179,9 +196,9 @@ export function createAhead(
       }
       const margin = Math.min(
         0.005,
-        (group.first - (groups[i - 1]?.last ?? group.first - 0.015)) / 3,
+        (group.first - (groups[i - 1]?.last ?? -backPad)) / 3,
         ((groups[i + 1]?.first ?? (maxNm > group.last ? maxNm : group.last + 3e-7)) - group.last) / 3,
-        group.first > 0 ? group.first / 3 : 0.005,
+        north ? ((Math.PI / 2 - Math.abs(position(group.last)[0] * RAD)) * EARTH_NM) / (2 * Math.abs(north)) : Infinity,
       );
       const before = await state(group.first - margin),
         after = await state(group.last + margin);

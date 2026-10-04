@@ -273,3 +273,72 @@ test("a course expressed in additional revolutions has the same crossings", asyn
   const q = fixture([{ zone: zone("A"), rings: [rect(1, 2)] }]);
   expect(await q(0, 0, 450, { maxNm: 80 })).toEqual(await q(0, 0, 90, { maxNm: 80 }));
 });
+test("near-east and west courses recover distance on a stable axis", async () => {
+  const distance = ((3440.065 * Math.PI) / 180) * Math.cos((50 * Math.PI) / 180);
+  for (const direction of [90, 270]) {
+    const longitude = direction === 90 ? 1 : -1;
+    const q = fixture(
+      [],
+      [
+        [
+          [longitude, 49],
+          [longitude, 51],
+        ],
+      ],
+    );
+    for (const delta of [-1e-10, -1e-11, 0, 1e-11, 1e-10]) {
+      const r = await q(50, 0, direction + delta, { maxNm: 80 });
+      expect(r.crossings).toHaveLength(1);
+      expect(r.crossings[0]!.distanceNm).toBeCloseTo(distance, 6);
+      expect(r.crossings[0]!.point[1]).toBeCloseTo(longitude, 8);
+    }
+  }
+});
+test("origin contacts remain zero for every horizon", async () => {
+  const q = fixture([
+    { zone: zone("A"), rings: [rect(0, 1)] },
+    { zone: zone("B"), rings: [rect(1, 2)] },
+  ]);
+  for (const maxNm of [0.0005, 0.1, 1, 2, 10, 20, 30, 50]) {
+    const r = await q(0, 1, 90, { maxNm });
+    expect(summary(r)).toEqual([[["A"], ["B"]]]);
+    expect(r.crossings[0]!.distanceNm).toBe(0);
+  }
+});
+test("origin classification stays inside the immediately preceding narrow territory", async () => {
+  const q = fixture([
+    { zone: zone("C"), rings: [rect(0, 1 - 0.000045)] },
+    { zone: zone("A"), rings: [rect(1 - 0.000045, 1)] },
+    { zone: zone("B"), rings: [rect(1, 2)] },
+  ]);
+  expect(summary(await q(0, 1, 90, { maxNm: 50 }))).toEqual([[["A"], ["B"]]]);
+});
+test("backward classification of a southbound origin contact stays below the pole", async () => {
+  const q = fixture([
+    { zone: zone("A"), rings: [rect(-1, 1, 88, 89.99999)] },
+    { zone: zone("B"), rings: [rect(-1, 1, 89.99999, 90)] },
+  ]);
+  const r = await q(89.99999, 0, 180, { maxNm: 1 });
+  expect(summary(r)).toEqual([[["B"], ["A"]]]);
+  expect(r.crossings[0]!.distanceNm).toBe(0);
+});
+test("numerical horizon contacts are included without extending their distance", async () => {
+  for (const longitude of [0.2, 0.4, 1.1, 1.5, 3, 4, 5]) {
+    const maxNm = ((3440.065 * Math.PI) / 180) * longitude;
+    const r = await fixture(
+      [],
+      [
+        [
+          [longitude, -1],
+          [longitude, 1],
+        ],
+      ],
+    )(0, 0, 90, { maxNm });
+    expect(r.crossings).toHaveLength(1);
+    expect(r.crossings[0]!.distanceNm).toBe(maxNm);
+    expect(r.crossings[0]!.point[1]).toBeCloseTo(longitude, 8);
+  }
+});
+test("extreme polar horizons fail promptly instead of scanning unbounded revolutions", async () => {
+  await expect(fixture([])(89.99999999, 0, 90)).rejects.toThrow(/revolutions/);
+});
