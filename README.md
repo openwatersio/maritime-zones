@@ -86,7 +86,7 @@ Queries never answer from partial data. A tile they can't get throws an error th
 
 ## Performance
 
-Median milliseconds per call on an Apple M1 Ultra (macOS arm64, Node 26.10.0) with the `v0.2.0` tiles, measured on 2026-10-04 with reader 0.2.2. Offline is the Node API over cached tiles. Range is the browser path: HTTP range reads of the compressed tiles from a local server, with the requests and bytes one call makes. On GitHub Pages each request also pays network latency. Timings depend on the machine and its load; requests and bytes are exact.
+Median milliseconds per call on an Apple M1 Ultra (macOS arm64, Node 26.10.0) with the `v0.2.0` tiles, measured on 2026-10-04 with reader 0.2.2 at commit e16892e. [PR #29](https://github.com/openwatersio/maritime-zones/pull/29) records the paired local comparison; the [CI comparison](https://github.com/openwatersio/maritime-zones/actions/runs/37209741138) runs on Ubuntu separately. Offline is the Node API over cached tiles. Range is the browser path: HTTP range reads of the compressed tiles from a local server, with the requests and bytes one call makes. On GitHub Pages each request also pays network latency. Timings depend on the machine and its load; requests and bytes are exact.
 
 | Workload                            | Offline ms | Range ms | Requests |    MB |
 | ----------------------------------- | ---------: | -------: | -------: | ----: |
@@ -108,7 +108,7 @@ A query far from any other territory is slow because its search box grows until 
 
 The search uses the first matching feature's distance to bound its next pass.
 
-For 500 warmed fixes off IJmuiden calling all three queries, the built Node reader uses about 123 MB resident on this Mac with Node 26.10.0 and the `v0.2.0` tiles. Tile buffers and JavaScript heap account for only part of resident memory; V8 also reserves space for temporary allocations. The [memory harness](CONTRIBUTING.md#performance) reports resident, heap and buffer memory and can sample garbage collected during queries. Node version, platform and workload affect these figures; no Raspberry Pi was measured.
+For 500 warmed fixes off IJmuiden calling `whereAmI()`, `distanceToLand()` and `nearestTerritory()`, the built Node reader uses about 123 MB resident on this Mac with Node 26.10.0 and the `v0.2.0` tiles. Tile buffers and JavaScript heap account for only part of resident memory; V8 also reserves space for temporary allocations. The [memory harness](CONTRIBUTING.md#performance) reports resident, heap and buffer memory and can sample garbage collected during queries. Node version, platform and workload affect these figures; no Raspberry Pi was measured.
 
 ## Data
 
