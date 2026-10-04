@@ -1,6 +1,6 @@
 # maritime-zones
 
-Offline answers to four questions about a position at sea: which maritime zones am I in, how far is the next territory, how far is territory X, and how far is land. The data is the [Marine Regions](https://www.marineregions.org/) Maritime Boundaries Geodatabase from the Flanders Marine Institute (VLIZ), cut into 10° FlatGeobuf tiles compressed as seekable zstd so a consumer only needs the tiles for the area it sails in.
+Offline answers about a position at sea: which maritime zones am I in, how far is the next territory, how far is territory X, how far is land, and where does my course cross those waters. The data is the [Marine Regions](https://www.marineregions.org/) Maritime Boundaries Geodatabase from the Flanders Marine Institute (VLIZ), cut into 10° FlatGeobuf tiles compressed as seekable zstd so a consumer only needs the tiles for the area it sails in.
 
 **Not for navigation.** Marine Regions states that its data "is not meant to be used for legal, economical … or navigational purposes" and "has no legal value whatsoever". Neither do these answers. Every consumer that shows them must say so.
 
@@ -43,6 +43,34 @@ await distanceToLand(40, -40); // 403.7 NM to the Azores
 - `distanceToLand(lat, lon)` is the distance to the nearest coastline.
 
 Distance results carry `distanceNm`, the initial great-circle `bearingDeg` and the nearest `point`. Searches stop at about 480 NM and return `null` beyond that. Distances use a spherical Earth and agree with ellipsoidal geodesics to within 0.5%.
+
+### Waters ahead
+
+`ahead(lat, lon, cogDeg, options)` follows a constant course over ground in degrees true along a spherical rhumb line. It returns the selected zones at the start and their territory transitions, ordered by along-course distance:
+
+```ts
+import { ahead } from "@openwaters/maritime-zones";
+
+await ahead(52.2, 4.2, 225, { maxNm: 120 });
+// {
+//   start: [{ layer: "12nm", iso_ter: "NLD", … }],
+//   crossings: [
+//     { kind: "water", distanceNm: 56.68, point: [51.53, 3.12],
+//       leaving: [{ iso_ter: "NLD", … }], entering: [{ iso_ter: "BEL", … }] },
+//     { kind: "water", distanceNm: 89.58, point: [51.15, 2.50],
+//       leaving: [{ iso_ter: "BEL", … }], entering: [{ iso_ter: "FRA", … }] },
+//     { kind: "coast", distanceNm: 97.79, point: [51.05, 2.34] }
+//   ]
+// }
+```
+
+`layers` defaults to sovereign waters (`internal`, `archipelagic`, `12nm`). `maxNm` defaults to 480 NM and must be positive and at most 480. A direct border crossing can leave and enter territories at the same point. Same-territory layer changes and water tangencies produce no event. Full `Zone` records preserve overlapping claims and joint regimes, including their second and third parties. For a joint zone, an `entering` record can include a party already present when another party is added. Zones without territory codes still report transitions between their zone identities. The package exports `AheadOptions`, `AheadResult`, and the discriminated `Crossing` type.
+
+Candidate boundaries within 1 metre of the earliest candidate are grouped into one crossing, using that candidate's distance. Larger gaps and overlaps stay separate. The coastline event uses the actual coastline-contact distance and ends the result. It includes tangencies, has no country identity, and does not establish entry onto land. Water polygons and the coastline can disagree: one Belgian approach has a roughly 405 m interval between its territorial-water exit and coastline contact.
+
+The starting position must be on water; the query does not validate that precondition. A course exactly along a boundary has no unique crossing. Coordinates and course must be finite, latitude must be strictly between −90° and 90°, and longitude must be between −180° and 180°. A horizon that reaches a pole throws `RangeError`. An empty `crossings` array means no transition or coastline contact was found within the horizon; missing tiles still throw.
+
+The caller calculates ETA with `crossing.distanceNm / sogKn * 60` for positive speed over ground in knots. Speed changes can reuse the crossings for the same starting position, course, and horizon.
 
 ## Tiles and the cache
 

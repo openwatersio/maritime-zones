@@ -36,7 +36,7 @@ CI runs:
 npm ci
 npm run lint
 npx tsc -p .
-npx vitest run test/regulations.test.ts test/package.test.ts
+npx vitest run test/regulations.test.ts test/package.test.ts test/ahead.test.ts test/feature.test.ts
 npm run demo:build
 gh release download -p tiles.json -p zones.json -D dist
 npm run package:build
@@ -45,6 +45,8 @@ npm run package:check
 ```
 
 CI does not run the full vitest suite, because the query tests need built tiles, and building them downloads every layer from VLIZ. The packaging smoke test uses the newest released metadata as a fixture and skips prepack, so CI can run before a new tile release exists. It installs with npm's nested strategy to catch undeclared runtime imports, calls `tilesFor()` without network access, and checks the shipped declarations with TypeScript. Publishing always runs prepack against the release pinned by `tileVersion`. Run `npm test` locally after `npm run build`. Before changing query or build logic, also run `node scripts/check.ts`, which should report 0 zone mismatches and distance errors under 1%.
+
+`test/ahead.test.ts` exercises the shared query factory with synthetic indexed geometries, including rhumb intersections, multiple longitude revolutions, overlapping claims, grouping across scan steps, and terminal coastline contact. It needs no downloaded tiles. `test/queries.test.ts` checks released-data courses, and `test/browser.test.ts` compares the same courses over HTTP ranges with the offline API.
 
 A separate CI job benchmarks the queries when `src/`, `benchmarks/`, the dependencies or the workflow change. It uses the released tiles, so it needs no build.
 
@@ -64,6 +66,8 @@ Each workload in [`benchmarks/cases.json`](benchmarks/cases.json) is one query a
 Both revisions use the current harness, tiles, dependencies and machine. The base is exported to a temporary directory, so the command never switches your checkout. Before timing, every tile the workloads can touch is downloaded into the reader's cache (`~/.cache/openwaters/maritime-zones/v<tileVersion>`, or `--cache` to use another directory, such as `dist/tiles` after a local build). Each workload gets seven pairs of base and candidate processes, alternating which runs first. A process warms up for 300 milliseconds, which includes loading its tiles, then the first pair calibrates a batch of at least 100 milliseconds and later pairs reuse it.
 
 The table reports median milliseconds per call and, for range mode, requests and bytes per call. A median slowdown above 20 percent fails the command, and so does a 20 percent rise in requests or bytes; `--threshold 10` tests another limit. The threshold is a policy limit; `npm test` and `scripts/check.ts` are the accuracy gates, and a workload whose answer differs between revisions fails the comparison outright. Timing is noisy on a busy machine, so repeat a suspicious run. Requests and bytes are exact.
+
+A query absent from the base revision is measured on the candidate and labeled `new`, with no regression percentage. The base report explicitly lists those unavailable workloads; a missing result for an existing query still fails. Course fingerprints include the starting zones, every crossing's kind, distance and point, and the full entering/leaving zone metadata. Shared workloads retain the same answer and regression gates.
 
 Raw samples, checksums, revisions, harness hash and machine metadata are saved under `.benchmarks/<timestamp>/` with `summary.md`; `--output` picks the directory. Compare saved reports from the same machine and harness with:
 
