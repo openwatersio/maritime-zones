@@ -10,7 +10,7 @@
 - `scripts/release-notes.ts` prints the release notes for the current build.
 - `scripts/update-notes.ts` prints the monthly check's WFS load and source changes.
 - `scripts/package-metadata.ts` downloads the metadata for `tileVersion` in `package.json` before packing. `scripts/build-package.ts` bundles the Node reader into `lib/index.js`; `tsconfig.package.json` emits its declarations. `scripts/check-package.ts` installs a tarball and checks the offline public API and consumer types.
-- `src/` is the reader: `index.ts` has the queries, `store.ts` finds tiles in memory, the cache or the GitHub release and checks them, and `tiles.ts` maps areas to tile names.
+- `src/` is the reader: `index.ts` exports the five queries and the download helpers, `queries.ts` has the zone and distance queries shared by Node and browser range reads, `ahead.ts` finds where a course crosses zone boundaries and the coast, `feature.ts` decodes tile features, `store.ts` finds tiles in memory, the cache or the GitHub release and checks them, and `tiles.ts` maps areas to tile names.
 - `test/` holds vitest cases. `queries.test.ts` checks answers at fixed points. `store.test.ts` checks downloading and caching against a local server that serves `dist/tiles` the way a release serves assets. Both read `dist/`.
 
 `tmp/`, `dist/` and `lib/` are not committed.

@@ -77,7 +77,7 @@ export async function ahead(lat: number, lon: number, cogDeg: number, options?: 
   return (await reader()).ahead(lat, lon, cogDeg, options);
 }
 
-/** Nearby zone pieces for the map; the four answers use the shared query engine. */
+/** Nearby zone pieces for the map; the answers use the shared query engine. */
 export async function zoneFeatures(rect: Rect, ids: Set<number>) {
   const data = await metadata();
   const found = [];

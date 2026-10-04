@@ -9,7 +9,7 @@ import { createQueries, type Zone } from "../src/queries.ts";
 import { DIST } from "../scripts/layers.ts";
 import { ahead, configure } from "../src/index.ts";
 
-it("answers all four questions from HTTP ranges of the published tile format", async () => {
+it("answers all five questions from HTTP ranges of the published tile format", async () => {
   const index = JSON.parse(readFileSync(join(DIST, "tiles.json"), "utf8")).tiles;
   const zones: Zone[] = JSON.parse(readFileSync(join(DIST, "zones.json"), "utf8"));
   const server = await serveRanges(join(DIST, "tiles"));
