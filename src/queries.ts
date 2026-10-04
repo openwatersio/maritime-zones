@@ -1,5 +1,6 @@
 import { box, tiles, wrapped } from "./tiles.ts";
 import type { QueryGeometry } from "./feature.ts";
+import { createAhead } from "./ahead.ts";
 
 export type Layer = "internal" | "archipelagic" | "12nm" | "24nm" | "eez" | "high_seas";
 
@@ -201,5 +202,5 @@ export function createQueries(
     return nearest("land", lat, lon, () => true);
   }
 
-  return { whereAmI, nearestTerritory, distanceTo, distanceToLand };
+  return { whereAmI, nearestTerritory, distanceTo, distanceToLand, ahead: createAhead(read, listed, zones, whereAmI) };
 }

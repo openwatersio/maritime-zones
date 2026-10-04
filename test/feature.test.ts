@@ -5,6 +5,41 @@ import { expect, test, vi } from "vitest";
 import { fromFeature } from "../src/feature.ts";
 import { createQueries, type Zone } from "../src/queries.ts";
 
+test("course scans share a boundary and land read without allocating zone coordinates", async () => {
+  const bytes = serialize({
+    type: "FeatureCollection",
+    features: ["zone", "boundary", "land"].map((kind) => ({
+      type: "Feature" as const,
+      properties: { kind, zone: 0 },
+      geometry: {
+        type: "LineString" as const,
+        coordinates: [
+          [1, 1],
+          [2, 1],
+        ],
+      },
+    })),
+  });
+  const kinds: string[] = [];
+  for await (const _ of deserialize(bytes, {
+    fromFeature(id, raw, header) {
+      const properties = eagerFeature(id, raw, header).properties!;
+      const geometry = vi.spyOn(raw, "geometry");
+      const result = fromFeature(id, raw, header, "line");
+      if (properties.kind === "zone") {
+        expect(result).toBeUndefined();
+        expect(geometry).not.toHaveBeenCalled();
+      } else {
+        expect(result!.geometry.xy.buffer).toBe(bytes.buffer);
+        kinds.push(result!.properties.kind);
+      }
+      return result ?? {};
+    },
+  })) {
+  }
+  expect(kinds.sort()).toEqual(["boundary", "land"]);
+});
+
 test("land queries decode only land geometry and preserve the GeoJSON result", async () => {
   const bytes = serialize({
     type: "FeatureCollection",

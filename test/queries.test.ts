@@ -1,11 +1,46 @@
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, test } from "vitest";
-import { configure, distanceTo, distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
+import { ahead, configure, distanceTo, distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
 
 // Needs dist/ from `npm run fetch && npm run build`; reads the built tiles directly, offline.
 beforeAll(() => configure({ cacheDir: fileURLToPath(new URL("../dist/tiles/", import.meta.url)), download: false }));
 
 const zones = async (lat: number, lon: number) => (await whereAmI(lat, lon)).map((z) => `${z.layer}:${z.iso_ter}`);
+
+describe("ahead", () => {
+  test("a Dutch coastal course crosses Belgium and France before its coastline contact", async () => {
+    const result = await ahead(52.2, 4.2, 225, { maxNm: 120 });
+    expect(result.start.map((z) => z.iso_ter)).toEqual(["NLD"]);
+    expect(
+      result.crossings.map((c) =>
+        c.kind === "coast" ? "coast" : [c.leaving.map((z) => z.iso_ter), c.entering.map((z) => z.iso_ter)],
+      ),
+    ).toEqual([[["NLD"], ["BEL"]], [["BEL"], ["FRA"]], "coast"]);
+    expect(result.crossings[0]!.distanceNm).toBeCloseTo(56.681, 2);
+    expect(result.crossings[1]!.distanceNm).toBeCloseTo(89.58, 2);
+    expect(result.crossings[2]!.distanceNm).toBeCloseTo(97.795, 2);
+  });
+  test("a North Sea course enters Belgium before the separate water-to-coast gap", async () => {
+    const result = await ahead(51.8, 2.85, 180, { maxNm: 80 });
+    expect(result.start).toEqual([]);
+    const first = result.crossings[0]!;
+    expect(first.kind === "water" && first.entering[0]!.iso_ter).toBe("BEL");
+    expect(first.distanceNm).toBeCloseTo(21.111, 2);
+    expect(result.crossings.map((c) => c.kind)).toEqual(["water", "water", "coast"]);
+    expect(result.crossings[2]!.distanceNm - result.crossings[1]!.distanceNm).toBeGreaterThan(0.2);
+  });
+  test("Fiji coastline contact is found after crossing the antimeridian", async () => {
+    const result = await ahead(-17.2, 179.8, 90, { maxNm: 120 });
+    expect(result.start[0]!.iso_ter).toBe("FJI");
+    expect(result.crossings).toHaveLength(1);
+    expect(result.crossings[0]!.kind).toBe("coast");
+    expect(result.crossings[0]!.point[1]).toBeLessThan(-179);
+    expect(result.crossings[0]!.distanceNm).toBeCloseTo(68.223, 2);
+  });
+  test("the westbound Atlantic horizon contains no sovereign crossings", async () => {
+    expect(await ahead(40, -40, 270)).toEqual({ start: [], crossings: [] });
+  });
+});
 
 describe("whereAmI", () => {
   test("off Ostend is Belgian territorial sea inside the Belgian EEZ", async () => {

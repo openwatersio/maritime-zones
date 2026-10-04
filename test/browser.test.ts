@@ -7,6 +7,7 @@ import { expect, it, vi } from "vitest";
 import { serveRanges } from "../benchmarks/range-server.ts";
 import { createQueries, type Zone } from "../src/queries.ts";
 import { DIST } from "../scripts/layers.ts";
+import { ahead, configure } from "../src/index.ts";
 
 it("answers all four questions from HTTP ranges of the published tile format", async () => {
   const index = JSON.parse(readFileSync(join(DIST, "tiles.json"), "utf8")).tiles;
@@ -33,6 +34,13 @@ it("answers all four questions from HTTP ranges of the published tile format", a
     expect((await reader.distanceTo(51.1, 1.4, "BEL"))?.distanceNm).toBeCloseTo(38.6, 0);
     expect((await reader.distanceToLand(40, -40))?.distanceNm).toBeGreaterThan(400);
     expect((await reader.whereAmI(-17.9, -179.9)).some((z) => z.layer === "archipelagic")).toBe(true);
+    configure({ cacheDir: join(DIST, "tiles"), download: false });
+    for (const [lat, lon, cog, maxNm] of [
+      [52.2, 4.2, 225, 120],
+      [-17.2, 179.8, 90, 120],
+      [40, -40, 270, 480],
+    ])
+      expect(await reader.ahead(lat!, lon!, cog!, { maxNm })).toEqual(await ahead(lat!, lon!, cog!, { maxNm }));
     expect(server.requests).toBeGreaterThan(0);
   } finally {
     await server.close();
@@ -59,10 +67,11 @@ it("retries a failed WASM download before initializing the browser codec", async
     });
   });
   try {
-    const { whereAmI, distanceToLand } = await import("../demo/reader.ts");
+    const { whereAmI, distanceToLand, ahead: browserAhead } = await import("../demo/reader.ts");
     await expect(whereAmI(51.25, 2.85)).rejects.toThrow("Could not load zstd.wasm: HTTP 503");
     expect((await whereAmI(51.25, 2.85)).map((z) => `${z.layer}:${z.iso_ter}`)).toEqual(["12nm:BEL", "eez:BEL"]);
     expect(wasmRequests).toBe(2);
+    expect((await browserAhead(51.8, 2.85, 180, { maxNm: 30 })).crossings[0]?.distanceNm).toBeCloseTo(21.111, 2);
     const land = await distanceToLand(66.2, 8.4);
     expect(land?.distanceNm).toBeCloseTo(79.25426694593823, 6);
     expect(land?.zone).toBeNull();

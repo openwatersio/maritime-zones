@@ -3,6 +3,7 @@ import { HttpReader } from "flatgeobuf/lib/mjs/http-reader.js";
 import { SeekableZstdReader } from "flatgeobuf/lib/mjs/seekable-zstd.js";
 import { createQueries, type Rect, type Zone } from "../src/queries.ts";
 import { tiles, wrapped } from "../src/tiles.ts";
+import type { AheadOptions } from "../src/ahead.ts";
 
 declare const TILE_VERSION: string;
 export const version = TILE_VERSION;
@@ -71,6 +72,9 @@ export async function distanceTo(lat: number, lon: number, iso: string) {
 }
 export async function distanceToLand(lat: number, lon: number) {
   return (await reader()).distanceToLand(lat, lon);
+}
+export async function ahead(lat: number, lon: number, cogDeg: number, options?: AheadOptions) {
+  return (await reader()).ahead(lat, lon, cogDeg, options);
 }
 
 /** Nearby zone pieces for the map; the four answers use the shared query engine. */

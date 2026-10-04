@@ -31,7 +31,8 @@ export function fromFeature(
   kind?: string,
 ): GeoJsonFeature | QueryFeature | undefined {
   const properties = parseProperties(feature, header.columns);
-  if (kind && properties.kind !== kind) return;
+  if (kind === "line" ? properties.kind !== "boundary" && properties.kind !== "land" : kind && properties.kind !== kind)
+    return;
   const geometry = feature.geometry()!;
   if (!kind) return { type: "Feature", id, properties, geometry: fromGeometry(geometry, header.geometryType) };
   return {

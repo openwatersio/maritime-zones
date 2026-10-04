@@ -7,8 +7,9 @@ import { createQueries, type Zone } from "./queries.ts";
 export { configure, type Config } from "./store.ts";
 export type { Area } from "./tiles.ts";
 export type { Layer, Zone, Hit, Options } from "./queries.ts";
+export type { AheadOptions, AheadResult, Crossing } from "./ahead.ts";
 
-export const { whereAmI, nearestTerritory, distanceTo, distanceToLand } = createQueries(
+export const { whereAmI, nearestTerritory, distanceTo, distanceToLand, ahead } = createQueries(
   async function* (tile, rect, kind) {
     const reader = ArrayReader.open(await load(tile));
     for await (const { id, feature } of reader.selectBbox(rect)) {

@@ -48,7 +48,7 @@ try {
       `import assert from 'node:assert/strict';
       import { join } from 'node:path';
       globalThis.fetch = () => { throw new Error('The smoke test must not use the network'); };
-      const { configure, tilesFor, whereAmI } = await import('@openwaters/maritime-zones');
+      const { ahead, configure, tilesFor, whereAmI } = await import('@openwaters/maritime-zones');
       configure({ download: false });
       await assert.rejects(whereAmI(51.25, 2.85), error => {
         assert.equal(error.code, 'MISSING_TILE');
@@ -62,6 +62,8 @@ try {
       assert.deepEqual(requests, ['https://github.com/openwatersio/maritime-zones/releases/download/v${tileVersion}/n50e0.fgb.zst']);
       globalThis.fetch = () => { throw new Error('The smoke test must not use the network'); };
       configure({ download: false, cacheDir: 'empty-cache' });
+      assert.equal(typeof ahead, 'function');
+      await assert.rejects(ahead(0, 0, 90, { maxNm: 0 }), RangeError);
       const tiles = tilesFor({ lat: 48.6, lon: -123.2, radiusNm: 5 });
       assert.deepEqual(tiles.map(t => t.tile), ['n40w130']);
       assert(tiles[0].bytes > 0);
@@ -71,10 +73,15 @@ try {
   );
   writeFileSync(
     join(work, "consumer.mts"),
-    `import { tilesFor, whereAmI, type Area, type Zone } from '@openwaters/maritime-zones';
+    `import { ahead, tilesFor, whereAmI, type AheadOptions, type AheadResult, type Crossing, type Area, type Zone } from '@openwaters/maritime-zones';
     const area: Area = { lat: 48.6, lon: -123.2, radiusNm: 5 };
     const tiles: { tile: string; bytes: number }[] = tilesFor(area);
-    const zones: Promise<Zone[]> = whereAmI(48.6, -123.2);`,
+    const zones: Promise<Zone[]> = whereAmI(48.6, -123.2);
+    const options: AheadOptions = { layers: ['12nm'], maxNm: 80 };
+    const course: Promise<AheadResult> = ahead(51.8, 2.85, 180, options);
+    function inspect(crossing: Crossing): Zone[] {
+      return crossing.kind === 'water' ? crossing.entering.concat(crossing.leaving) : [];
+    }`,
   );
   execFileSync(
     join(ROOT, "node_modules/.bin/tsc"),
