@@ -43,12 +43,12 @@ function wasmUrl() {
     });
   return wasm;
 }
-async function* read(tile: string, rect: Rect, kind?: string) {
+async function* read(tile: string, rect: Rect, kinds?: readonly string[]) {
   const codecUrl = await wasmUrl();
   const source = await SeekableZstdReader.open(new URL(`${tile}.fgb.zst`, base).href, false, {}, codecUrl);
   const reader = await HttpReader.openSource(source);
   for await (const { id, feature } of reader.selectBbox(rect)) {
-    const decoded = fromFeature(id, feature, reader.header, kind);
+    const decoded = fromFeature(id, feature, reader.header, kinds);
     if (decoded) yield decoded;
   }
 }

@@ -14,11 +14,11 @@ it("answers all five questions from HTTP ranges of the published tile format", a
   const zones: Zone[] = JSON.parse(readFileSync(join(DIST, "zones.json"), "utf8"));
   const server = await serveRanges(join(DIST, "tiles"));
   const reader = createQueries(
-    async function* (tile, rect, kind) {
+    async function* (tile, rect, kinds) {
       const source = await SeekableZstdReader.open(`${server.url}${tile}.fgb.zst`);
       const reader = await HttpReader.openSource(source);
       for await (const { id, feature } of reader.selectBbox(rect)) {
-        const decoded = fromFeature(id, feature, reader.header, kind);
+        const decoded = fromFeature(id, feature, reader.header, kinds);
         if (decoded) yield decoded;
       }
     },

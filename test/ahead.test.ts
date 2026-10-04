@@ -32,10 +32,12 @@ function fixture(zs: { zone: Zone; rings: P[][] }[], land: P[][] = []) {
         geometry: { xy: Float64Array.from(r.flat()), ends: null },
       })),
     );
-  return createQueries(
-    async function* (_, box, kind) {
+  const reads: { tile: string; kinds: readonly string[] }[] = [];
+  const { ahead } = createQueries(
+    async function* (tile, box, kinds) {
+      reads.push({ tile, kinds });
       for (const f of features) {
-        if (kind === "line" ? !["boundary", "land"].includes(f.properties.kind) : f.properties.kind !== kind) continue;
+        if (!kinds.includes(f.properties.kind)) continue;
         const xs = [...f.geometry.xy].filter((_, i) => i % 2 === 0),
           ys = [...f.geometry.xy].filter((_, i) => i % 2 === 1);
         if (
@@ -50,7 +52,8 @@ function fixture(zs: { zone: Zone; rings: P[][] }[], land: P[][] = []) {
     },
     () => new Proxy({}, { get: () => true }),
     () => zs.map((x) => x.zone),
-  ).ahead;
+  );
+  return Object.assign(ahead, { reads });
 }
 const summary = (x: any) =>
   x.crossings.map((c: any) =>
@@ -63,6 +66,21 @@ test("shared border groups exit A and entry B", async () => {
   ])(0, 0.5, 90, { maxNm: 50 });
   expect(summary(result)).toEqual([[["A"], ["B"]]]);
   expect(Math.abs(result.crossings[0]!.distanceNm - 30.02023)).toBeLessThan(0.001);
+});
+test("a course reads each tile once and classifies each gap between crossings once", async () => {
+  const q = fixture([
+    { zone: zone("A"), rings: [rect(1, 2, 4, 6)] },
+    { zone: zone("B"), rings: [rect(2, 3, 4, 6)] },
+    { zone: zone("C"), rings: [rect(3, 4, 4, 6)] },
+  ]);
+  expect(summary(await q(5, 1.5, 90, { maxNm: 180 }))).toEqual([
+    [["A"], ["B"]],
+    [["B"], ["C"]],
+    [["C"], []],
+  ]);
+  // Six 30 NM legs in one tile, and three crossings: the start plus one sample per gap after each.
+  expect(q.reads.filter((r) => r.kinds.includes("boundary")).map((r) => r.tile)).toEqual(["n0e0"]);
+  expect(q.reads.filter((r) => r.kinds.includes("zone"))).toHaveLength(4);
 });
 test("outside -> A -> outside", async () => {
   expect(summary(await fixture([{ zone: zone("A"), rings: [rect(1, 2)] }])(0, 0, 90, { maxNm: 150 }))).toEqual([

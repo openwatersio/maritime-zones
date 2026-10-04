@@ -15,26 +15,30 @@ type Header = Parameters<typeof decodeFeature>[2];
 type GeoJsonFeature = ReturnType<typeof decodeFeature>;
 
 export function fromFeature(id: number, feature: RawFeature, header: Header): GeoJsonFeature;
-export function fromFeature(id: number, feature: RawFeature, header: Header, kind: string): QueryFeature | undefined;
 export function fromFeature(
   id: number,
   feature: RawFeature,
   header: Header,
-  kind?: string,
+  kinds: readonly string[],
+): QueryFeature | undefined;
+export function fromFeature(
+  id: number,
+  feature: RawFeature,
+  header: Header,
+  kinds?: readonly string[],
 ): GeoJsonFeature | QueryFeature | undefined;
 
-/** Queries use views into the tile; map drawing still requests GeoJSON by omitting kind. */
+/** Queries use views into the tile for the kinds they ask for; map drawing still requests GeoJSON by omitting kinds. */
 export function fromFeature(
   id: number,
   feature: RawFeature,
   header: Header,
-  kind?: string,
+  kinds?: readonly string[],
 ): GeoJsonFeature | QueryFeature | undefined {
   const properties = parseProperties(feature, header.columns);
-  if (kind === "line" ? properties.kind !== "boundary" && properties.kind !== "land" : kind && properties.kind !== kind)
-    return;
+  if (kinds && !kinds.includes(properties.kind as string)) return;
   const geometry = feature.geometry()!;
-  if (!kind) return { type: "Feature", id, properties, geometry: fromGeometry(geometry, header.geometryType) };
+  if (!kinds) return { type: "Feature", id, properties, geometry: fromGeometry(geometry, header.geometryType) };
   return {
     type: "Feature" as const,
     id,

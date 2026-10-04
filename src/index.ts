@@ -10,10 +10,10 @@ export type { Layer, Zone, Hit, Options } from "./queries.ts";
 export type { AheadOptions, AheadResult, Crossing } from "./ahead.ts";
 
 export const { whereAmI, nearestTerritory, distanceTo, distanceToLand, ahead } = createQueries(
-  async function* (tile, rect, kind) {
+  async function* (tile, rect, kinds) {
     const reader = ArrayReader.open(await load(tile));
     for await (const { id, feature } of reader.selectBbox(rect)) {
-      const decoded = fromFeature(id, feature, reader.header, kind);
+      const decoded = fromFeature(id, feature, reader.header, kinds);
       if (decoded) yield decoded;
     }
   },

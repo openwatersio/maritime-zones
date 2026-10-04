@@ -37,12 +37,11 @@ export interface Options {
 
 export type Rect = { minX: number; minY: number; maxX: number; maxY: number };
 
+/** Reads the features of the listed kinds whose bbox meets the rect from one tile. */
+export type Read = (tile: string, rect: Rect, kinds: readonly string[]) => AsyncIterable<unknown>;
+
 /** The same query math for offline files and browser range reads. */
-export function createQueries(
-  read: (tile: string, rect: Rect, kind: string) => AsyncIterable<unknown>,
-  listed: () => Record<string, unknown>,
-  zones: () => Zone[],
-) {
+export function createQueries(read: Read, listed: () => Record<string, unknown>, zones: () => Zone[]) {
   /** Past this search radius (degrees of latitude, ~480 NM) nothing counts as near. */
   const MAX_RADIUS = 8;
 
@@ -62,7 +61,7 @@ export function createQueries(
       const rect = { minX: box[0], minY: box[1], maxX: box[2], maxY: box[3] };
       for (const tile of tiles(box)) {
         if (!listed()[tile]) continue;
-        for await (const f of read(tile, rect, kind)) {
+        for await (const f of read(tile, rect, [kind])) {
           const feature = f as unknown as {
             properties: { kind: Kind; zone?: number };
             geometry: QueryGeometry;

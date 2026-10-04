@@ -1,4 +1,4 @@
-import type { Layer, Options, Rect, Zone } from "./queries.ts";
+import type { Layer, Options, Read, Zone } from "./queries.ts";
 import type { QueryGeometry } from "./feature.ts";
 import { tiles, wrapped } from "./tiles.ts";
 
@@ -40,7 +40,7 @@ const parties = (z: Zone): string[] => {
 };
 
 export function createAhead(
-  read: (tile: string, rect: Rect, kind: string) => AsyncIterable<unknown>,
+  read: Read,
   listed: () => Record<string, unknown>,
   zones: () => Zone[],
   whereAmI: (lat: number, lon: number) => Promise<Zone[]>,
@@ -136,7 +136,8 @@ export function createAhead(
       return distances;
     }
 
-    const candidates: { distanceNm: number; coast: boolean }[] = [];
+    type Box = [number, number, number, number];
+    const legs: { lo: number; hi: number; a: [number, number]; b: [number, number]; boxes: Box[] }[] = [];
     for (let lo = -backPad; lo < maxNm;) {
       let hi = Math.min(maxNm, lo + 30);
       const a = position(lo);
@@ -148,17 +149,37 @@ export function createAhead(
       }
       const firstLon = wrap(a[1]),
         lastLon = firstLon + b[1] - a[1];
-      const bounds: [number, number, number, number] = [
+      const bounds: Box = [
         Math.min(firstLon, lastLon) - 1e-7,
         Math.min(a[0], b[0]) - 1e-7,
         Math.max(firstLon, lastLon) + 1e-7,
         Math.max(a[0], b[0]) + 1e-7,
       ];
-      for (const bb of wrapped(bounds)) {
-        const rect = { minX: bb[0], minY: bb[1], maxX: bb[2], maxY: bb[3] };
+      legs.push({ lo, hi, a, b, boxes: wrapped(bounds) });
+      lo = hi;
+    }
+    // One read per tile covers every leg through it; each leg then keeps the lines a read of its own box returns.
+    const spans = new Map<string, Box>();
+    for (const leg of legs)
+      for (const bb of leg.boxes)
         for (const tile of tiles(bb)) {
-          if (!listed()[tile]) continue;
-          for await (const raw of read(tile, rect, "line")) {
+          const span = spans.get(tile);
+          spans.set(
+            tile,
+            span
+              ? [Math.min(span[0], bb[0]), Math.min(span[1], bb[1]), Math.max(span[2], bb[2]), Math.max(span[3], bb[3])]
+              : bb,
+          );
+        }
+    type Line = { coast: boolean; xy: Float64Array; box: Box };
+    const loaded = new Map<string, Promise<Line[]>>();
+    const lines = (tile: string) => {
+      let pending = loaded.get(tile);
+      if (!pending) {
+        const [minX, minY, maxX, maxY] = spans.get(tile)!;
+        pending = (async () => {
+          const found: Line[] = [];
+          for await (const raw of read(tile, { minX, minY, maxX, maxY }, ["boundary", "land"])) {
             const feature = raw as { properties: { kind: string; zone: number }; geometry: QueryGeometry };
             const coast = feature.properties.kind === "land";
             if (
@@ -167,6 +188,30 @@ export function createAhead(
             )
               continue;
             const xy = feature.geometry.xy;
+            const box: Box = [Infinity, Infinity, -Infinity, -Infinity];
+            for (let j = 0; j < xy.length; j += 2) {
+              box[0] = Math.min(box[0], xy[j]!);
+              box[1] = Math.min(box[1], xy[j + 1]!);
+              box[2] = Math.max(box[2], xy[j]!);
+              box[3] = Math.max(box[3], xy[j + 1]!);
+            }
+            found.push({ coast, xy, box });
+          }
+          return found;
+        })();
+        loaded.set(tile, pending);
+      }
+      return pending;
+    };
+
+    const candidates: { distanceNm: number; coast: boolean }[] = [];
+    for (const { lo, hi, a, b, boxes } of legs) {
+      for (const bb of boxes) {
+        for (const tile of tiles(bb)) {
+          if (!listed()[tile]) continue;
+          for (const { coast, xy, box } of await lines(tile)) {
+            // The same inclusive bbox test the tile index applies to a read of this leg's box.
+            if (box[2] < bb[0] || box[0] > bb[2] || box[3] < bb[1] || box[1] > bb[3]) continue;
             for (let j = 2; j < xy.length; j += 2) {
               for (const rawDistance of intersect(xy[j - 2]!, xy[j - 1]!, xy[j]!, xy[j + 1]!, (a[1] + b[1]) / 2)) {
                 const distanceNm =
@@ -191,7 +236,6 @@ export function createAhead(
         }
       }
       if (candidates.some((c) => c.coast && c.distanceNm >= 0)) break;
-      lo = hi;
     }
     candidates.sort((a, b) => a.distanceNm - b.distanceNm);
     const groups: { first: number; last: number; coast: number | null }[] = [];
@@ -202,22 +246,30 @@ export function createAhead(
         if (c.coast) previous.coast = Math.min(previous.coast ?? Infinity, c.distanceNm);
       } else groups.push({ first: c.distanceNm, last: c.distanceNm, coast: c.coast ? c.distanceNm : null });
     }
-    for (let i = 0; i < groups.length; i++) {
-      const group = groups[i]!;
-      if (group.first < 0) continue;
-      if (group.coast !== null) {
-        const [a, b] = position(group.coast);
-        result.crossings.push({ kind: "coast", distanceNm: group.coast, point: [a, wrap(b)] });
-        break;
-      }
-      const margin = Math.min(
-        0.005,
-        (group.first - (groups[i - 1]?.last ?? -backPad)) / 3,
-        ((groups[i + 1]?.first ?? (maxNm > group.last ? maxNm : group.last + 3e-7)) - group.last) / 3,
-        north ? ((Math.PI / 2 - Math.abs(position(group.last)[0] * RAD)) * EARTH_NM) / (2 * Math.abs(north)) : Infinity,
-      );
-      const before = await state(group.first - margin),
-        after = await state(group.last + margin);
+    const next = groups.findIndex((g) => g.first >= 0);
+    const stop = next < 0 ? -1 : groups.findIndex((g, i) => i >= next && g.coast !== null);
+    const water = next < 0 ? [] : groups.slice(next, stop < 0 ? undefined : stop);
+    // Membership only changes at a group, so one sample inside each gap classifies both groups beside it.
+    const edges = [groups[next - 1]?.last ?? -backPad, ...water.flatMap((g) => [g.first, g.last])];
+    const last = edges.at(-1)!;
+    edges.push(groups[stop]?.first ?? (maxNm > last ? maxNm : last + 3e-7));
+    const states = await Promise.all(
+      water.length
+        ? Array.from({ length: water.length + 1 }, (_, k) => {
+            const lo = edges[2 * k]!,
+              hi = edges[2 * k + 1]!;
+            // The start already lies in the first gap unless a crossing sits on it.
+            if (k === 0 && hi > 0) return result.start;
+            const pole = north
+              ? ((Math.PI / 2 - Math.abs(position(lo)[0] * RAD)) * EARTH_NM) / (2 * Math.abs(north))
+              : Infinity;
+            return state(lo + Math.min((hi - lo) / 2, pole));
+          })
+        : [],
+    );
+    water.forEach((group, k) => {
+      const before = states[k]!,
+        after = states[k + 1]!;
       const from = new Set(before.flatMap(parties)),
         to = new Set(after.flatMap(parties));
       const leaving = before.filter((z) => parties(z).some((iso) => !to.has(iso)));
@@ -226,6 +278,11 @@ export function createAhead(
         const [a, b] = position(group.first);
         result.crossings.push({ kind: "water", distanceNm: group.first, point: [a, wrap(b)], leaving, entering });
       }
+    });
+    if (stop >= 0) {
+      const distanceNm = groups[stop]!.coast!;
+      const [a, b] = position(distanceNm);
+      result.crossings.push({ kind: "coast", distanceNm, point: [a, wrap(b)] });
     }
     return result;
   };

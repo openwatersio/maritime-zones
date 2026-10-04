@@ -52,11 +52,12 @@ if (mode === "offline") {
     return response;
   };
   api = createQueries(
-    async function* (tile: string, rect: any, kind?: string) {
+    // Forwarded untouched: older revisions pass a single kind, newer ones a list.
+    async function* (tile: string, rect: any, kinds: unknown) {
       const source = await SeekableZstdReader.open(`${base}${tile}.fgb.zst`);
       const reader = await HttpReader.openSource(source);
       for await (const { id, feature } of reader.selectBbox(rect)) {
-        const decoded = fromFeature(id, feature, reader.header, kind);
+        const decoded = fromFeature(id, feature, reader.header, kinds);
         if (decoded) yield decoded;
       }
     },
