@@ -115,36 +115,29 @@ Queries never answer from partial data. A tile they can't get throws an error th
 
 ## Performance
 
-Median milliseconds per call on a four-core GitHub Actions runner (AMD EPYC 7763, Ubuntu x64, Node 24.21.0) with reader 0.2.2 and the `v0.2.0` tiles, measured on 2026-10-04. The [CI run](https://github.com/openwatersio/maritime-zones/actions/runs/37209792878) passed all 26 comparisons; its `performance` artifact contains the raw samples and machine metadata. [PR #29](https://github.com/openwatersio/maritime-zones/pull/29) records the before-and-after comparison. Offline is the Node API over cached tiles. Range is the browser path: HTTP range reads of the compressed tiles from a local server, with the requests and bytes one call makes. On GitHub Pages each request also pays network latency. Timings depend on the machine and its load; requests and bytes are exact.
+Median milliseconds per call on a four-core GitHub Actions runner (AMD EPYC 9V74, Ubuntu x64, Node 24.21.0) with reader 0.3.0 and the `v0.2.0` tiles, measured on 2026-10-04. The [CI run](https://github.com/openwatersio/maritime-zones/actions/runs/37219322555) passed all 26 comparisons and measured the 8 course workloads; its `performance` artifact contains the raw samples and machine metadata. [PR #29](https://github.com/openwatersio/maritime-zones/pull/29) and [PR #31](https://github.com/openwatersio/maritime-zones/pull/31) record the before-and-after comparisons. Offline is the Node API over cached tiles. Range is the browser path: HTTP range reads of the compressed tiles from a local server, with the requests and bytes one call makes. On GitHub Pages each request also pays network latency. Timings depend on the machine and its load; requests and bytes are exact.
 
 | Workload                            | Offline ms | Range ms | Requests |    MB |
 | ----------------------------------- | ---------: | -------: | -------: | ----: |
-| whereAmI/off-ostend                 |       0.08 |      5.7 |        5 |  0.20 |
-| whereAmI/haro-strait                |       0.14 |      8.7 |        7 |  0.27 |
-| whereAmI/taveuni                    |       0.11 |      8.9 |        8 |  0.22 |
-| nearestTerritory/dover              |       0.32 |     15.3 |       14 |  0.53 |
-| nearestTerritory/haro-strait        |       1.42 |     25.4 |       15 |  0.57 |
-| nearestTerritory/taveuni            |       9.26 |    115.5 |       71 |  2.18 |
-| nearestTerritory/mid-north-atlantic |       1.09 |     77.6 |       98 |  0.69 |
-| nearestTerritory/norwegian-sea      |     308.55 |   1689.6 |      343 | 14.75 |
-| nearestTerritory/labrador-sea       |     175.05 |    901.8 |      174 |  7.35 |
-| distanceTo/dover-bel                |       2.13 |     63.2 |       43 |  1.80 |
-| distanceToLand/haro-strait          |       1.41 |     15.5 |        8 |  0.31 |
-| distanceToLand/mid-north-atlantic   |       0.93 |     64.7 |       86 |  0.63 |
-| distanceToLand/norwegian-sea        |      54.96 |    347.7 |       97 |  4.44 |
+| whereAmI/off-ostend                 |       0.05 |      4.3 |        5 |  0.20 |
+| whereAmI/haro-strait                |       0.11 |      6.4 |        7 |  0.27 |
+| whereAmI/taveuni                    |       0.08 |      6.0 |        8 |  0.22 |
+| nearestTerritory/dover              |       0.24 |     11.8 |       14 |  0.53 |
+| nearestTerritory/haro-strait        |       1.09 |     16.9 |       15 |  0.57 |
+| nearestTerritory/taveuni            |       7.08 |     88.1 |       71 |  2.18 |
+| nearestTerritory/mid-north-atlantic |       0.80 |     47.5 |       98 |  0.69 |
+| nearestTerritory/norwegian-sea      |     303.12 |   1333.5 |      343 | 14.75 |
+| nearestTerritory/labrador-sea       |     142.55 |    685.6 |      174 |  7.35 |
+| distanceTo/dover-bel                |       1.58 |     43.4 |       43 |  1.80 |
+| distanceToLand/haro-strait          |       1.03 |     11.8 |        8 |  0.31 |
+| distanceToLand/mid-north-atlantic   |       0.74 |     40.0 |       86 |  0.63 |
+| distanceToLand/norwegian-sea        |      51.24 |    290.5 |       97 |  4.44 |
+| ahead/north-sea-belgium             |       0.46 |     19.0 |       22 |  0.94 |
+| ahead/dutch-coast                   |       2.43 |     30.1 |       28 |  1.16 |
+| ahead/fiji-antimeridian             |       0.83 |     21.8 |       27 |  0.81 |
+| ahead/atlantic-empty                |       0.17 |     15.2 |       30 |  0.21 |
 
-A query far from any other territory is slow because its search box grows until it holds the answer, up to 480 NM. Readers filter each feature's kind before yielding it to the query, then measure containment and distance directly from FlatBuffers coordinate views. Queries do not build GeoJSON coordinate arrays; the map decoder still does when drawing zone pieces. All feature kinds share a tile index, so filtering saves processing but does not reduce range requests or bytes. CI benchmarks every change to the queries; [CONTRIBUTING](CONTRIBUTING.md#performance) explains how to run the harness.
-
-Course-query medians for reader 0.3.0 on an Apple M1 Ultra (macOS arm64, Node 26.10.0), measured on 2026-10-04 against the same `v0.2.0` tiles. These use seven warmed processes per workload and a local HTTP range server; they exclude tile downloads and network latency. The [benchmark harness](benchmarks/run.ts) records raw samples and machine metadata. Existing workloads passed their time, request and byte regression gates against reader 0.2.2.
-
-| Course                                     | Offline ms | Range ms | Requests |   MB |
-| ------------------------------------------ | ---------: | -------: | -------: | ---: |
-| North Sea toward Belgium                   |       0.42 |    22.75 |       39 | 1.68 |
-| Dutch waters through Belgium toward France |       1.90 |    32.94 |       61 | 2.53 |
-| Fiji across the antimeridian               |       0.73 |    25.12 |       51 | 1.48 |
-| Atlantic with no crossing within 480 NM    |       0.36 |    29.45 |      126 | 0.63 |
-
-The search uses the first matching feature's distance to bound its next pass.
+A query far from any other territory is slow because its search box grows until it holds the answer, up to 480 NM; the search uses the first matching feature's distance to bound its next pass. A course reads each tile it crosses once, so `ahead/atlantic-empty` covers 480 NM of open water in 30 requests. Readers filter each feature's kind before yielding it to the query, then measure containment and distance directly from FlatBuffers coordinate views. Queries do not build GeoJSON coordinate arrays; the map decoder still does when drawing zone pieces. All feature kinds share a tile index, so filtering saves processing but does not reduce range requests or bytes. CI benchmarks every change to the queries; [CONTRIBUTING](CONTRIBUTING.md#performance) explains how to run the harness.
 
 Memory after 500 warmed fixes at each position, calling `whereAmI()`, `distanceToLand()` and `nearestTerritory()` with the built reader 0.2.2 and the `v0.2.0` tiles. These separate-process measurements were taken on 2026-10-04 on an Apple M1 Ultra (macOS arm64, Node 26.10.0), separately from the CI timings above. MB is decimal.
 
