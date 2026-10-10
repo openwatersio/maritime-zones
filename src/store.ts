@@ -15,6 +15,7 @@ const TILE_VERSION: string = JSON.parse(readFileSync(new URL("../package.json", 
 const RELEASES = "https://github.com/openwatersio/maritime-zones/releases/download";
 /** Tiles downloaded at once by download(). */
 const PARALLEL = 4;
+const MEMORY_BYTES = 64 * 1024 ** 2;
 
 export interface Config {
   /** Where downloaded tiles are kept. Default: $XDG_CACHE_HOME or ~/.cache, under openwaters/maritime-zones/v<tileVersion>. */
@@ -38,11 +39,14 @@ const defaults = (): Config => ({
 
 let config = defaults();
 const memory = new Map<string, Uint8Array>();
+let memoryBytes = 0;
 const inflight = new Map<string, Promise<Uint8Array>>();
+const loading = new Map<string, Promise<Uint8Array>>();
 
 export function configure(options: Partial<Config>) {
   config = { ...defaults(), ...options };
   memory.clear();
+  memoryBytes = 0;
 }
 
 let index: Record<string, { bytes: number; sha256: string }> | undefined;
@@ -115,12 +119,34 @@ function ensure(tile: string): Promise<Uint8Array> {
   return pending;
 }
 
-/** A tile's bytes, kept in memory after the first read. */
+/** A tile's bytes, retained in a byte-budgeted least-recently-used cache. */
 export async function load(tile: string): Promise<Uint8Array> {
-  let bytes = memory.get(tile);
-  // FlatGeobuf needs an owned Uint8Array, not a Buffer view: https://github.com/flatgeobuf/flatgeobuf/issues/526
-  if (!bytes) memory.set(tile, (bytes = new Uint8Array(zstdDecompressSync(await ensure(tile)))));
-  return bytes;
+  const cached = memory.get(tile);
+  if (cached) {
+    memory.delete(tile);
+    memory.set(tile, cached);
+    return cached;
+  }
+  let pending = loading.get(tile);
+  if (!pending) {
+    const settings = config;
+    pending = (async () => {
+      // FlatGeobuf needs an owned Uint8Array, not a Buffer view: https://github.com/flatgeobuf/flatgeobuf/issues/526
+      const bytes = new Uint8Array(zstdDecompressSync(await ensure(tile)));
+      if (config === settings && bytes.byteLength <= MEMORY_BYTES) {
+        while (memoryBytes + bytes.byteLength > MEMORY_BYTES) {
+          const [oldest, evicted] = memory.entries().next().value!;
+          memory.delete(oldest);
+          memoryBytes -= evicted.byteLength;
+        }
+        memory.set(tile, bytes);
+        memoryBytes += bytes.byteLength;
+      }
+      return bytes;
+    })().finally(() => loading.delete(tile));
+    loading.set(tile, pending);
+  }
+  return pending;
 }
 
 /** Make sure tiles are in the cache, PARALLEL at a time, without holding them in memory. */

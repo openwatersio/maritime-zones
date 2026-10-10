@@ -146,7 +146,18 @@ Memory after 500 warmed fixes at each position, calling `whereAmI()`, `distanceT
 | IJmuiden      |         120 |              22 |                7 |
 | Norwegian Sea |         257 |              29 |               77 |
 
-Resident memory includes retained tiles, live objects and V8's garbage-collection headroom. Array buffers include both retained tiles and temporary reader buffers. The [memory harness](CONTRIBUTING.md#performance) reports these counters and can sample allocations collected during queries. Node version, platform and workload affect these figures; no Raspberry Pi was measured.
+The Node reader retains at most 64 MiB of decompressed tiles, evicting the least recently used tiles as a passage moves on. Evicted tiles stay in the on-disk cache and can be read again offline. A tile larger than the budget is read without being retained. Concurrent loads of the same tile share its decompressed bytes. Active queries and temporary decompression buffers can exceed the cache budget.
+
+Resident memory includes retained tiles, live objects and V8's garbage-collection headroom. Array buffers include both retained tiles and temporary reader buffers. The [memory harness](CONTRIBUTING.md#performance) reports these counters and can sample allocations collected during queries. Node version, platform and workload affect these figures.
+
+On a Raspberry Pi 5 Model B with 8 GB RAM (Linux arm64, Node 24.21.0), reader 0.3.1 uses the following time and memory over 200 warmed fixes per position with the same three queries and verified `v0.2.0` tiles. Each position ran in a separate process, and the Pi reported no thermal throttling. Each timing is one run.
+
+| Position      | ms/fix | Resident MB |
+| ------------- | -----: | ----------: |
+| IJmuiden      |   5.51 |       113.7 |
+| Norwegian Sea | 651.70 |       470.9 |
+
+A separate synthetic traversal queried the centers of 46 tiles with `whereAmI()`, collecting garbage between positions. Retained tile buffers ended at 53.0 MB and stayed below 64 MiB throughout; final resident memory after GC was 181.6 MB. This tests eviction across changing tiles, not a recorded passage. Fixtures were in RAM-backed `/tmp`, so these tests do not measure SD-card I/O or live Signal K integration.
 
 ## Data
 
