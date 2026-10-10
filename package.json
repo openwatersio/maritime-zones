@@ -1,6 +1,6 @@
 {
   "name": "@openwaters/maritime-zones",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "tileVersion": "0.2.0",
   "description": "Offline lookups against the Marine Regions maritime boundaries: which zone you are in and how far it is to a territory or to land, and where a course crosses those waters.",
   "keywords": [

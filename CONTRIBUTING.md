@@ -36,7 +36,7 @@ CI runs:
 npm ci
 npm run lint
 npx tsc -p .
-npx vitest run test/regulations.test.ts test/package.test.ts test/ahead.test.ts test/feature.test.ts
+npx vitest run test/regulations.test.ts test/package.test.ts test/ahead.test.ts test/feature.test.ts test/memory.test.ts
 npm run demo:build
 gh release download -p tiles.json -p zones.json -D dist
 npm run package:build
@@ -173,7 +173,7 @@ To publish by hand instead, for example while the trusted publisher is not regis
 npm ci
 npm run lint
 npx tsc -p .
-npx vitest run test/regulations.test.ts test/package.test.ts
+npx vitest run test/regulations.test.ts test/package.test.ts test/ahead.test.ts test/feature.test.ts test/memory.test.ts
 npm pack --dry-run
 npm run package:check
 npm publish --otp=<code>
