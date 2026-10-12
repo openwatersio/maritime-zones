@@ -18,7 +18,16 @@ The main black-water example combines `whereAmI()` and `distanceToLand()` with a
 
 ## Usage
 
-Needs Node 24 or newer.
+Needs Node 24 or newer. The package is ESM. In a CommonJS plugin, use dynamic import inside an async function:
+
+```js
+async function zonesAt(lat, lon) {
+  const { whereAmI } = await import("@openwaters/maritime-zones");
+  return whereAmI(lat, lon);
+}
+```
+
+Dynamic import still needs Node 24 when called. A host that supports older Node versions can disable its optional zones feature before importing the package.
 
 ```sh
 npm install @openwaters/maritime-zones
@@ -43,6 +52,19 @@ await distanceToLand(40, -40); // 403.7 NM to the Azores
 - `distanceToLand(lat, lon)` is the distance to the nearest coastline.
 
 Distance results carry `distanceNm`, the initial great-circle `bearingDeg` and the nearest `point`. Searches stop at about 480 NM and return `null` beyond that. Distances use a spherical Earth and agree with ellipsoidal geodesics to within 0.5%.
+
+### Reading zone results
+
+`whereAmI()` returns all containing layers. To show sovereign waters, filter to `internal`, `archipelagic`, and `12nm`:
+
+```ts
+const sovereignLayers = new Set(["internal", "archipelagic", "12nm"]);
+const waters = (await whereAmI(48.6, -123.2)).filter((zone) => sovereignLayers.has(zone.layer));
+```
+
+Keep the full zone records when displaying overlapping claims or joint regimes. `iso_ter2` and `iso_ter3` identify additional parties; their sovereign fallbacks are `iso_sov2` and `iso_sov3`. A map keyed only by `iso_ter` loses those parties. The primary `iso_ter` falls back to the sovereign's code when the territory has none. `territory` is the display name of the territory; `name` names the zone and can include its layer. Both territory names and codes can be null.
+
+An empty sovereign-water filter can mean EEZ, contiguous zone, high seas, or land. An empty `whereAmI()` result means no containing zone, including on land. To identify high seas, look for a `high_seas` record. A thrown query means the answer is unavailable; substituting `[]` would confuse missing data with a successful lookup.
 
 ### Waters ahead
 
@@ -82,11 +104,16 @@ To be ready before losing signal, download an area ahead of time. Pass a box or 
 ```ts
 import { configure, download, tilesFor } from "@openwaters/maritime-zones";
 
+const cacheDir = "/path/to/plugin-data/maritime-zones-tiles";
+configure({ cacheDir });
+
 tilesFor({ lat: 48.6, lon: -123.2, radiusNm: 150 }); // [{ tile: "n40w130", bytes: … }, …]
 await download({ minLat: 47, minLon: -125, maxLat: 51, maxLon: -122 }); // { tiles: 2, bytes: … }
 
-configure({ download: false }); // never touch the network
+configure({ cacheDir, download: false }); // keep the same cache, never touch the network
 ```
+
+Prefetching does not turn downloads off. Set `download: false` after the online work finishes to prevent queries from fetching missing tiles over a metered connection. That setting also applies to `download()` itself. Its `{ tiles, bytes }` report is the total for the selected area, including files already cached, rather than the traffic transferred by that call.
 
 A cruising area needs a few megabytes. These are the `v0.2.0` download sizes that `tilesFor()` reports for some sample areas:
 
@@ -111,7 +138,25 @@ The cost follows the 10° grid, not the area's size. An area inside one tile cos
 - `baseUrl`: where tiles are downloaded from. Defaults to `https://github.com/openwatersio/maritime-zones/releases/download/v<tileVersion>`.
 - `download`: `true` by default. With `false`, a query that needs a tile that isn't cached throws.
 
-Queries never answer from partial data. A tile they can't get throws an error that names the tile, with `code` set to `MISSING_TILE` (not cached and downloads are off), `DOWNLOAD_FAILED` or `CHECKSUM`.
+Configuration is shared by all importers of the same module instance, including plugins in the same server. Each `configure()` call rebuilds the settings from defaults and the supplied options, and clears the decompressed in-memory cache. It keeps files on disk. Configure at startup or between completed query batches, and pass every custom setting you need to retain. Calling it before every position query discards the warm tiles; calling `configure({ download: false })` after a custom `cacheDir` switches back to the default directory.
+
+Queries never answer from partial data. A tile they can't get throws an error with `tile` naming the tile and `code` set to `MISSING_TILE` (not cached and downloads are off), `DOWNLOAD_FAILED` or `CHECKSUM`. Other failures, such as filesystem permission errors, can propagate too. Optional features can catch these errors and report zones as unavailable while keeping the rest of their output.
+
+### Routes and offline coverage
+
+For a route across the antimeridian, use an ordered longitude interval that extends past ±180°, or split the area into boxes on each side. This box covers 178°E to 178°W:
+
+```ts
+await download({ minLat: -22, maxLat: -18, minLon: 178, maxLon: 182 });
+```
+
+`tilesFor()` and `download()` wrap that interval and deduplicate its tiles. Taking the minimum and maximum of normalized route longitudes, such as −178° and 178°, selects the long way around the world. A reversed interval (`minLon: 178, maxLon: -178`) does not describe a crossing box. Cover the route's segments as well as its waypoints, and include any distance-query search radius. Point lookups only need tiles at the sample positions, including adjacent tiles when a point lies on a tile edge.
+
+For crossings along one constant rhumb-line course, use `ahead()`. For a planned route with changing courses, a caller can compare `whereAmI()` results along samples, but the interval limits the result: a 1 NM interval can miss a shorter transit through a zone, and reports a crossing at the first sample after it. Compare territory identities across the selected layers so a same-territory layer change does not create a border event. Keep additional parties in overlapping claims. ETA and suppression of short visits or gaps are caller policies.
+
+If a sample fails, retain the last successfully checked route distance and mark the remaining route as unchecked. A prefix of successfully detected transitions is incomplete, even if it is empty. Each individual query requires complete tiles, but that guarantee does not establish coverage of a whole route.
+
+Zone results contain geometry and source attributes. Customs, discharge restrictions, and satellite connectivity need caller-supplied rules; a zone transition alone cannot determine them. Keep attribution and the no-navigation notice with displayed results, including cached briefings.
 
 ## Performance
 
