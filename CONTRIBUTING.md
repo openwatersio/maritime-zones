@@ -148,6 +148,13 @@ To release tiles:
 1. Review unfinished specs and plans, preserve lasting guidance in maintained docs, and remove completed plans. Have a human review documentation changes in the release PR. If either source has changed, run `npm run fetch -- --fresh` and commit the new `upstream.lock.json` in a pull request. The release workflow refuses to publish data that differs from the committed lock.
 2. Bump `tileVersion` in `package.json` in a pull request. Also bump the npm `version` and update `package-lock.json` so consumers can install the reader with the new tile pin.
 3. Run the **Release tiles** workflow from the Actions tab. It fetches the maritime boundaries and World Countries from VLIZ, builds and compresses the tiles, runs the tests against them and writes the release notes to the run summary. With `dry_run` left on, the default, that's all it does. With `dry_run` off, it creates a draft release, uploads every compressed tile plus both metadata files and NOTICE, checks the count, publishes, verifies a query from an empty cache and deploys the identical files to Pages.
+4. Title the published release and write its opening summary, following the [Open Waters release notes guidance](https://github.com/openwatersio/.github/blob/main/docs/agents/releases.md#release-notes). The workflow titles the release with its tag and fills the notes with the build's tile counts, sizes and licenses, so replace the title and put the summary above that text. The title is a short headline of what changed for developers using the zone tiles, in sentence case with no period and no version. The summary opens with what is new and who it is for, then lists breaking changes and upgrade steps, then the changes people will notice, each linking its pull request. Leave out chores, CI changes and bot bumps unless a runtime dependency change matters to users.
+
+   ```sh
+   gh release view v<tileVersion> --repo openwatersio/maritime-zones --json body --jq .body > notes.md
+   # Add the summary at the top of notes.md, then:
+   gh release edit v<tileVersion> --repo openwatersio/maritime-zones --title "<headline>" --notes-file notes.md
+   ```
 
 Uploads are spaced eight seconds apart to stay below [GitHub's content-creation limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), so uploading a full global build takes about 80 minutes. Rate limits honor GitHub's retry delay, with bounded backoff. If a run stops with a draft, rerun the workflow: it checks every existing asset's hash and uploads only missing files. If those hashes differ, delete the draft and start again. Published releases cannot be resumed or replaced.
 
