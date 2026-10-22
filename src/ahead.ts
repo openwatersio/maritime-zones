@@ -32,7 +32,7 @@ const mercator = (latitude: number) => Math.log(Math.tan(Math.PI / 4 + latitude 
 /** Δφ/Δψ of a rhumb leg; a tiny Δφ takes the cosine limit, where the Mercator difference cancels. */
 const stretch = (from: number, to: number) =>
   Math.abs(to - from) < 1e-6 ? Math.cos((from + to) / 2) : (to - from) / (mercator(to) - mercator(from));
-const parties = (z: Zone): string[] => {
+export const parties = (z: Zone): string[] => {
   const codes = [z.iso_ter ?? z.iso_sov, z.iso_ter2 ?? z.iso_sov2, z.iso_ter3 ?? z.iso_sov3].filter(
     (iso): iso is string => !!iso,
   );

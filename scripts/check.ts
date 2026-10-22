@@ -12,6 +12,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { configure, distanceToLand, nearestTerritory, whereAmI } from "../src/index.ts";
+import { territoriesHere } from "../src/queries.ts";
 import { box as circleBox, TILE, tiles } from "../src/tiles.ts";
 import { DIST, LAYERS, WFS } from "./layers.ts";
 
@@ -112,9 +113,9 @@ for (let i = 0; i < count; i++) {
 
   const next = await nearestTerritory(lat, lon);
   if (next) {
-    const here = (await whereAmI(lat, lon)).find((z) => z.iso_ter)?.iso_ter;
+    const here = territoriesHere(await whereAmI(lat, lon));
     const where = zonesWhere(
-      (z) => ["internal", "archipelagic", "12nm"].includes(z.layer) && z.iso_ter != null && z.iso_ter !== here,
+      (z) => ["internal", "archipelagic", "12nm"].includes(z.layer) && z.iso_ter != null && !here.has(z.iso_ter),
     );
     const truth = oracle(lat, lon, next.distanceNm / 60 + 0.1, where);
     const error = truth == null ? Infinity : Math.abs(next.distanceNm - truth) / Math.max(truth, 0.1);

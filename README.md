@@ -46,12 +46,12 @@ await distanceTo(51.1, 1.4, "BEL"); // 38.6 NM to Belgian waters
 await distanceToLand(40, -40); // 403.7 NM to the Azores
 ```
 
-- `whereAmI(lat, lon)` returns every zone containing the point, innermost first: internal waters, archipelagic waters, territorial sea (12 NM), contiguous zone (24 NM), EEZ, high seas. The EEZ includes the territorial sea, so a point off a coast is in both. A point on land, including an island, is in no zone.
-- `nearestTerritory(lat, lon)` finds the nearest waters of any territory other than the one you are in. "Waters" means sovereign waters by default (internal, archipelagic and 12 NM), because a country's nearest water is often internal: in Haro Strait, Canada's internal waters are 1.4 NM away while its territorial sea is 60 NM away on the outer coast. Pass `{ layers: ["eez"] }` to measure to another zone instead.
+- `whereAmI(lat, lon)` returns every zone containing the point, innermost first: internal waters, archipelagic waters, territorial sea (12 NM), contiguous zone (24 NM), EEZ, high seas. The EEZ includes the territorial sea, so a point off a coast is usually in both, though their territories can differ where boundaries meet. A point on land, including an island, is in no zone.
+- `nearestTerritory(lat, lon)` finds the nearest waters of any territory other than those you are in. Inside sovereign waters, that excludes every party of every internal, archipelagic or 12 NM zone containing the point; elsewhere, only the territory of the innermost zone, so in Canada's EEZ the nearest other territory is not Canada. "Waters" means sovereign waters by default (internal, archipelagic and 12 NM), because a country's nearest water is often internal: in Haro Strait, Canada's internal waters are 1.4 NM away while its territorial sea is 60 NM away on the outer coast. Pass `{ layers: ["eez"] }` to measure to another zone instead.
 - `distanceTo(lat, lon, iso)` is the distance to one territory's waters by ISO 3166-1 alpha-3 code, and 0 inside them.
 - `distanceToLand(lat, lon)` is the distance to the nearest coastline.
 
-Distance results carry `distanceNm`, the initial great-circle `bearingDeg` and the nearest `point`. Searches stop at about 480 NM and return `null` beyond that. Distances use a spherical Earth and agree with ellipsoidal geodesics to within 0.5%.
+Distance results carry `distanceNm`, the initial great-circle `bearingDeg` and the nearest `point`. Searches stop at about 480 NM and return `null` beyond that; `nearestTerritory()` also returns `null` when every territory within that range is one you are in, as at Blaine Point below. Distances use a spherical Earth and agree with ellipsoidal geodesics to within 0.5%.
 
 ### Reading zone results
 
@@ -62,9 +62,9 @@ const sovereignLayers = new Set(["internal", "archipelagic", "12nm"]);
 const waters = (await whereAmI(48.6, -123.2)).filter((zone) => sovereignLayers.has(zone.layer));
 ```
 
-Keep the full zone records when displaying overlapping claims or joint regimes. `iso_ter2` and `iso_ter3` identify additional parties; their sovereign fallbacks are `iso_sov2` and `iso_sov3`. A map keyed only by `iso_ter` loses those parties. The primary `iso_ter` falls back to the sovereign's code when the territory has none. `territory` is the display name of the territory; `name` names the zone and can include its layer. Both territory names and codes can be null.
+Keep the full zone records when displaying overlapping claims or joint regimes. `iso_ter2` and `iso_ter3` identify additional parties; their sovereign fallbacks are `iso_sov2` and `iso_sov3`. A map keyed only by `iso_ter` loses those parties. Separate records can also disagree: near Blaine Point, Portland Canal (55.03333, -130.21667), `whereAmI()` returns Canadian internal waters, the US territorial sea and the Canadian EEZ as separate records, each with null second and third parties, so compare `iso_ter` across all records as well as within each. The primary `iso_ter` falls back to the sovereign's code when the territory has none. `territory` is the display name of the territory; `name` names the zone and can include its layer. Both territory names and codes can be null.
 
-An empty sovereign-water filter can mean EEZ, contiguous zone, high seas, or land. An empty `whereAmI()` result means no containing zone, including on land. To identify high seas, look for a `high_seas` record. A thrown query means the answer is unavailable; substituting `[]` would confuse missing data with a successful lookup.
+An empty sovereign-water filter can mean EEZ, contiguous zone, high seas, or land. An empty `whereAmI()` result means no containing zone, including on land. Generalized source boundaries can also leave water in narrow channels outside every zone: three British Columbia narrows stations lie about 60 to 570 m outside Canadian internal waters. `nearestTerritory()` reports how far the nearest waters are, but a short distance does not place the point inside them, and the reader does not substitute one for the other. To identify high seas, look for a `high_seas` record. A thrown query means the answer is unavailable; substituting `[]` would confuse missing data with a successful lookup.
 
 ### Waters ahead
 
