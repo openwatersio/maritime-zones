@@ -60,6 +60,35 @@ describe("whereAmI", () => {
     // Rabi Island, Fiji, 16°30′S 179°59′W.
     expect(await whereAmI(-16.5, -179.99)).toEqual([]);
   });
+
+  // Marine Regions source data, matched by the live WFS; see issue #44. Update deliberately if a source release moves these.
+  test.each([
+    ["Meyers Narrows", 52.61667, -128.65, 564],
+    ["Grenville Channel", 53.6, -129.68333, 417],
+    ["Tuck Narrows", 54.4, -130.25, 62],
+  ])(
+    "%s, a BC narrows station, resolves to no zone just outside Canadian internal waters",
+    async (_, lat, lon, metres) => {
+      await expect(whereAmI(lat, lon)).resolves.toEqual([]);
+      const hit = await distanceTo(lat, lon, "CAN");
+      expect(hit?.zone?.mrgid).toBe(49553);
+      expect(hit!.distanceNm * 1852).toBeCloseTo(metres, -1);
+    },
+  );
+
+  test("Blaine Point keeps the Canadian internal and US territorial records from separate features", async () => {
+    const result = await whereAmI(55.03333, -130.21667);
+    expect(result.map((z) => [z.layer, z.mrgid, z.iso_ter])).toEqual([
+      ["internal", 49553, "CAN"],
+      ["12nm", 49177, "USA"],
+      ["eez", 8493, "CAN"],
+    ]);
+    expect(result.every((z) => z.iso_ter2 === null && z.iso_ter3 === null)).toBe(true);
+  });
+
+  test("Boston Islands, the BC control, is Canadian internal waters inside the Canadian EEZ", async () => {
+    expect(await zones(54.68333, -130.56667)).toEqual(["internal:CAN", "eez:CAN"]);
+  });
 });
 
 describe("nearestTerritory", () => {
