@@ -113,7 +113,9 @@ function showHit(hit: Hit | null, label: string, lat: number, lon: number) {
     append("p", "No result within the search limit", result, "headline");
     append(
       "p",
-      "The search stops at approximately 480 NM; no result does not mean zero distance.",
+      mode === "nearest"
+        ? "The search stops at approximately 480 NM and skips the territories this point is in. No result does not mean zero distance."
+        : "The search stops at approximately 480 NM; no result does not mean zero distance.",
       result,
       "description",
     );
@@ -236,7 +238,7 @@ async function run() {
         append("p", "No maritime zone at this point", result, "headline");
         append(
           "p",
-          "Land and islands are holes in the maritime-zone polygons. Move the marker offshore to query the surrounding waters.",
+          "Land and islands are holes in the maritime-zone polygons, and generalized boundaries can leave narrow channels outside every zone. Move the marker offshore to query the surrounding waters.",
           result,
           "description",
         );
@@ -312,7 +314,7 @@ async function run() {
         "p",
         mode === "land"
           ? "Coastline distance is geometric. A regulation may define shore or nearest land using a different legal baseline."
-          : "Territory distances measure internal, archipelagic and territorial waters by default. The next territory excludes the one you are currently in.",
+          : "Territory distances measure internal, archipelagic and territorial waters by default. The next territory skips the territories this point is in.",
         result,
         "explanation",
       );

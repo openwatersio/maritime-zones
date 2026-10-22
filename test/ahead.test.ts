@@ -33,7 +33,7 @@ function fixture(zs: { zone: Zone; rings: P[][] }[], land: P[][] = []) {
       })),
     );
   const reads: { tile: string; kinds: readonly string[] }[] = [];
-  const { ahead } = createQueries(
+  const { ahead, nearestTerritory } = createQueries(
     async function* (tile, box, kinds) {
       reads.push({ tile, kinds });
       for (const f of features) {
@@ -53,7 +53,7 @@ function fixture(zs: { zone: Zone; rings: P[][] }[], land: P[][] = []) {
     () => new Proxy({}, { get: () => true }),
     () => zs.map((x) => x.zone),
   );
-  return Object.assign(ahead, { reads });
+  return Object.assign(ahead, { reads, nearestTerritory });
 }
 const summary = (x: any) =>
   x.crossings.map((c: any) =>
@@ -359,4 +359,37 @@ test("numerical horizon contacts are included without extending their distance",
 });
 test("extreme polar horizons fail promptly instead of scanning unbounded revolutions", async () => {
   await expect(fixture([])(89.99999999, 0, 90)).rejects.toThrow(/revolutions/);
+});
+test("nearestTerritory skips every party of the sovereign waters you are in", async () => {
+  // In both B's and C's territorial seas at once: neither is another territory.
+  const overlap = fixture([
+    { zone: zone("B"), rings: [rect(0, 1)] },
+    { zone: zone("C"), rings: [rect(0.5, 1.5)] },
+    { zone: zone("D"), rings: [rect(3, 4)] },
+  ]);
+  expect((await overlap.nearestTerritory(0, 0.75))?.zone?.iso_ter).toBe("D");
+  // A joint territorial sea whose second party has only a sovereign code.
+  const joint = fixture([
+    { zone: zone("A", "12nm", { iso_ter2: null, iso_sov2: "B" }), rings: [rect(0, 1)] },
+    { zone: zone("B"), rings: [rect(1.5, 2)] },
+    { zone: zone("C"), rings: [rect(3, 4)] },
+  ]);
+  expect((await joint.nearestTerritory(0, 0.5))?.zone?.iso_ter).toBe("C");
+});
+test("nearestTerritory still reports the territorial sea of an EEZ that contains you", async () => {
+  // A's territorial sea inside B's EEZ, with B's territorial sea to the east.
+  const inEez = fixture([
+    { zone: zone("A"), rings: [rect(0, 1)] },
+    { zone: zone("B", "eez"), rings: [rect(-1, 3, -2, 2)] },
+    { zone: zone("B"), rings: [rect(1.5, 2)] },
+    { zone: zone("C"), rings: [rect(4, 5)] },
+  ]);
+  expect((await inEez.nearestTerritory(0, 0.5))?.zone?.iso_ter).toBe("B");
+  // Outside sovereign waters, in an EEZ claimed by A and B: B's nearby territorial sea is still another territory.
+  const claim = fixture([
+    { zone: zone("A", "eez", { iso_ter2: "B" }), rings: [rect(0, 1)] },
+    { zone: zone("B"), rings: [rect(1.5, 2)] },
+    { zone: zone("A"), rings: [rect(3, 4)] },
+  ]);
+  expect((await claim.nearestTerritory(0, 0.5))?.zone?.iso_ter).toBe("B");
 });

@@ -199,4 +199,4 @@ Enable GitHub Pages with GitHub Actions as its source before publishing. The mir
 - The GDAL FlatGeobuf driver cannot overwrite a layer. Delete the output file before running `ogr2ogr`.
 - Every WFS response carries a fresh `timeStamp`, so `upstream.lock.json` hashes only the features. Hashing the raw response would change the lock on every fetch.
 - Scripts and tests that read a local build call `configure({ cacheDir: "dist/tiles", download: false })`. Without it the reader looks in the user cache and tries to download from a release that may not exist.
-- A point on an island is in no zone: islands are holes in every zone polygon. An empty `whereAmI` on land is correct.
+- A point on an island is in no zone: islands are holes in every zone polygon. An empty `whereAmI` on land is correct. Generalized boundaries can also leave narrow channels outside every zone; see the BC narrows fixtures in `test/queries.test.ts`.

@@ -1,6 +1,6 @@
 import { box, tiles, wrapped } from "./tiles.ts";
 import type { QueryGeometry } from "./feature.ts";
-import { createAhead, EARTH_NM, LAYERS, RAD, SOVEREIGN, wrap } from "./ahead.ts";
+import { createAhead, EARTH_NM, LAYERS, parties, RAD, SOVEREIGN, wrap } from "./ahead.ts";
 
 export type Layer = "internal" | "archipelagic" | "12nm" | "24nm" | "eez" | "high_seas";
 
@@ -41,6 +41,18 @@ export type Rect = { minX: number; minY: number; maxX: number; maxY: number };
 export type Read = (tile: string, rect: Rect, kinds: readonly string[]) => AsyncIterable<unknown>;
 
 /** The same query math for offline files and browser range reads. */
+/**
+ * The territories you are in. Inside sovereign waters, every party of every sovereign record counts, since separate
+ * records can name different territories at one point. Elsewhere only the innermost record's territory counts: in
+ * Canada's EEZ, Canada is not another territory, but the other party of an overlapping EEZ claim still is.
+ */
+export function territoriesHere(zones: Zone[]): Set<string> {
+  const sovereign = zones.filter((z) => SOVEREIGN.includes(z.layer));
+  if (sovereign.length) return new Set(sovereign.flatMap(parties));
+  const first = zones.find((z) => z.iso_ter)?.iso_ter;
+  return new Set(first ? [first] : []);
+}
+
 export function createQueries(read: Read, listed: () => Record<string, unknown>, zones: () => Zone[]) {
   /** Past this search radius (degrees of latitude, ~480 NM) nothing counts as near. */
   const MAX_RADIUS = 8;
@@ -166,14 +178,14 @@ export function createQueries(read: Read, listed: () => Record<string, unknown>,
     }
   }
 
-  /** Nearest point of another territory's waters (default: sovereign waters). */
+  /** Nearest point of the waters of a territory you are not in (default: sovereign waters). */
   async function nearestTerritory(lat: number, lon: number, { layers = SOVEREIGN }: Options = {}): Promise<Hit | null> {
-    const here = (await whereAmI(lat, lon)).find((z) => z.iso_ter)?.iso_ter ?? null;
+    const here = territoriesHere(await whereAmI(lat, lon));
     return nearest(
       "boundary",
       lat,
       lon,
-      (z) => !!z && layers.includes(z.layer) && z.iso_ter != null && z.iso_ter !== here,
+      (z) => !!z && layers.includes(z.layer) && z.iso_ter != null && !here.has(z.iso_ter),
     );
   }
 
