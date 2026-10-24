@@ -1,0 +1,44 @@
+name: Ubuntu native tile round-trip validation
+
+on:
+  pull_request:
+    paths: [".github/workflows/ubuntu-native-roundtrip.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  round-trip:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mise.toml
+          cache: npm
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libzstd-dev cmake
+          ogr2ogr --version
+          cmake --version
+          cc --version
+          node --version
+      - name: Build the production compressor
+        run: |
+          curl -fL https://github.com/martinellimarco/t2sz/archive/refs/tags/v1.2.5.tar.gz -o "$RUNNER_TEMP/t2sz.tar.gz"
+          echo "4bdc590a8a2085951cfbe83ef6ab22b5fd4723163662e1aae41260c0b5a49a01  $RUNNER_TEMP/t2sz.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/t2sz.tar.gz" -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/t2sz-1.2.5" -B "$RUNNER_TEMP/t2sz-build" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/t2sz-build"
+          echo "$RUNNER_TEMP/t2sz-build" >> "$GITHUB_PATH"
+      - run: npm ci
+      - name: Exercise GDAL, production compression and the Node reader
+        run: npx --no-install vitest run test/build.test.ts
