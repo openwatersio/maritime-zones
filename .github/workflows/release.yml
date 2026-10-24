@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
       contents: write
@@ -123,7 +123,7 @@ jobs:
     concurrency:
       group: pages
       cancel-in-progress: false
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
