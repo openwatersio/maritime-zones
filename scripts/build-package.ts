@@ -21,7 +21,7 @@ await build({
   platform: "node",
   target: "node24",
   packages: "external",
-  // FlatGeobuf 4.5.0's deep entry logs every index node: https://github.com/flatgeobuf/flatgeobuf/pull/533
+  // FlatGeobuf's lib/mjs modules log every index node. Its console-free public entries don't export ArrayReader.
   alias: { flatgeobuf: join(ROOT, "node_modules/flatgeobuf") },
   drop: ["console"],
 });
