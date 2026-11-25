@@ -1,5 +1,7 @@
 # Contributing
 
+Every change follows the org-wide [rigor rules](https://github.com/openwatersio/.github/blob/main/docs/agents/rigor.md). The first of them: when something fails or looks wrong, find the cause and fix it there instead of working around it.
+
 ## Layout
 
 - `scripts/fetch.ts` downloads the maritime-zone layers and World Countries from the VLIZ WFS into `tmp/`, one feature per request, and writes `upstream.lock.json`. Zone features use their MRGIDs; country features use WFS feature IDs because territory IDs can be shared.
