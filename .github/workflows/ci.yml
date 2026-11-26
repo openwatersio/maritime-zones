@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions: { contents: read }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: mise.toml
           cache: npm
@@ -39,7 +39,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with: { fetch-depth: 0 }
       - name: Skip unless the queries, the harness or the toolchain changed
         id: changes
@@ -48,7 +48,7 @@ jobs:
             echo 'run=true' >> "$GITHUB_OUTPUT"
           fi
       - if: steps.changes.outputs.run == 'true'
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: mise.toml
           cache: npm
@@ -63,7 +63,7 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           gh release download "$TAG" -p tiles.json -p zones.json -D dist
       - if: steps.changes.outputs.run == 'true'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: ~/.cache/openwaters/maritime-zones
           key: tiles-${{ env.TAG }}-${{ hashFiles('benchmarks/cases.json') }}
@@ -74,7 +74,7 @@ jobs:
         name: Publish timing table
         run: cat benchmark-results/summary.md >> "$GITHUB_STEP_SUMMARY"
       - if: always() && steps.changes.outputs.run == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: performance
           path: benchmark-results

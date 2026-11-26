@@ -32,6 +32,8 @@ npm test
 
 ## Checks
 
+Run `gh actions-lock` after adding a workflow or changing an action reference, and commit the generated lockfile with the workflow changes. Install it with `gh extension install github/gh-actions-lock`. Dependabot updates lockfile entries for action version bumps in onboarded workflows.
+
 CI runs:
 
 ```sh
